@@ -80,6 +80,7 @@ common_incl = \
 	include/socketowner.hpp \
 	include/stat.hpp \
 	include/strings.hpp \
+	include/switch_stun.h \
 	include/task.hpp \
 	include/time.hpp \
 	include/variables.hpp \
@@ -113,6 +114,7 @@ common_SOURCES = \
 	src/socketowner.cpp \
 	src/stat.cpp \
 	src/strings.cpp \
+	src/switch_stun.c \
 	src/task.cpp \
 	src/time.cpp \
 	src/variables.cpp \

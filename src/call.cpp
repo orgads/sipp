@@ -49,6 +49,8 @@
 #include <sys/wait.h>
 #include <assert.h>
 
+#define PCAPPLAY
+
 #ifdef PCAPPLAY
 #include "send_packets.h"
 #endif
@@ -178,6 +180,16 @@ static std::string find_in_sdp(std::string const &pattern, std::string const &ms
 }
 
 #ifdef PCAPPLAY
+static void get_value(std::string const &pattern, std::string const &msg, char *out, size_t out_size)
+{
+    std::string value = find_in_sdp(pattern, msg);
+
+    if (value.empty())
+        memset(out, 0, out_size);
+    else
+        memcpy(out, value.c_str(), out_size);
+}
+
 void call::get_remote_media_addr(std::string const &msg)
 {
     std::string host = find_in_sdp(media_ip_is_ipv6 ? "c=IN IP6 " : "c=IN IP4 ", msg);
@@ -204,6 +216,13 @@ void call::get_remote_media_addr(std::string const &msg)
     if (!port.empty()) {
         gai_getsockaddr(&play_args_v.to, host.c_str(), port.c_str(),
                         AI_NUMERICHOST | AI_NUMERICSERV, family);
+    }
+
+    get_value("a=ice-ufrag:", msg, play_args_a.remote_ufrag, sizeof(play_args_a.remote_ufrag));
+    get_value("a=ice-pwd:", msg, play_args_a.remote_password, sizeof(play_args_a.remote_password));
+    if (last_send_msg) {
+        get_value("a=ice-ufrag:", last_send_msg, play_args_a.local_ufrag, sizeof(play_args_a.local_ufrag));
+        get_value("a=ice-pwd:", last_send_msg, play_args_a.local_password, sizeof(play_args_a.local_password));
     }
 }
 #endif
@@ -3725,14 +3744,19 @@ call::T_ActionResult call::executeAction(const char* msg, message* curmsg)
 #ifdef PCAPPLAY
         } else if ((currentAction->getActionType() == CAction::E_AT_PLAY_PCAP_AUDIO) ||
                    (currentAction->getActionType() == CAction::E_AT_PLAY_PCAP_IMAGE) ||
+                   (currentAction->getActionType() == CAction::E_AT_PLAY_PCAP_AUDIO_TCP) ||
                    (currentAction->getActionType() == CAction::E_AT_PLAY_PCAP_VIDEO) ||
                    (currentAction->getActionType() == CAction::E_AT_PLAY_DTMF)) {
             play_args_t* play_args = 0;
             if ((currentAction->getActionType() == CAction::E_AT_PLAY_PCAP_AUDIO) ||
                 (currentAction->getActionType() == CAction::E_AT_PLAY_DTMF)) {
                 play_args = &(this->play_args_a);
+                play_args->tcp = false;
             } else if (currentAction->getActionType() == CAction::E_AT_PLAY_PCAP_IMAGE) {
                 play_args = &(this->play_args_i);
+            } else if (currentAction->getActionType() == CAction::E_AT_PLAY_PCAP_AUDIO_TCP) {
+                play_args = &(this->play_args_a);
+                play_args->tcp = true;
             } else if (currentAction->getActionType() == CAction::E_AT_PLAY_PCAP_VIDEO) {
                 play_args = &(this->play_args_v);
             } else {
@@ -4108,7 +4132,11 @@ void *send_wrapper(void *arg)
     //  ERROR("Can't set RTP play thread realtime parameters");
     pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
     pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL);
-    send_packets(s);
+    if (s->tcp) {
+      send_packets_tcp(s);
+    } else {
+      send_packets(s);
+    }
     pthread_exit(NULL);
     return NULL;
 }

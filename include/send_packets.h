@@ -41,6 +41,7 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 
+#include "switch_stun.h"
 #include "prepare_pcap.h"
 
 inline void timerdiv(struct timeval* tvp, float div);
@@ -118,6 +119,11 @@ typedef struct {
     /* non-zero if the thread should destroy the *pcap when done playing or aborted */
     int free_pcap_when_done;
     uint16_t last_seq_no;
+    char remote_ufrag[SWITCH_STUN_UFRAG_LENGTH];
+    char local_ufrag [SWITCH_STUN_UFRAG_LENGTH];
+    char remote_password[SWITCH_STUN_PASSWORD_LENGTH];
+    char local_password [SWITCH_STUN_PASSWORD_LENGTH];
+    int tcp;
 } play_args_t;
 
 #ifdef __cplusplus
@@ -128,6 +134,7 @@ extern "C"
     int parse_dtmf_play_args(const char*, pcap_pkts*, uint16_t start_seq_no);
     void free_pcaps(pcap_pkts* pkts);
     int send_packets(play_args_t*);
+    int send_packets_tcp (play_args_t *);
 #ifdef __cplusplus
 }
 #endif
