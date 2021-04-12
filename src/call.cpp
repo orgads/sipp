@@ -1045,7 +1045,18 @@ void call::init(scenario * call_scenario, SIPpSocket *socket, struct sockaddr_st
         for (file_map::iterator file_it = inFiles.begin();
                 file_it != inFiles.end();
                 file_it++) {
-            (*m_lineNumber)[file_it->first] = file_it->second->nextLine(userId);
+            const int line = file_it->second->nextLine(userId);
+            char lineContent[1000];
+            const int len = file_it->second->getLine(line, lineContent, sizeof(lineContent));
+            const int fields = std::count(lineContent, lineContent + len, ';') + 1;
+            for (int field = 0; field < fields; ++field) {
+                file_it->second->getField(line, field, lineContent, sizeof(lineContent));
+                std::stringstream stream;
+                stream << "field" << field;
+                generic[stream.str()] = lineContent;
+            }
+
+            (*m_lineNumber)[file_it->first] = line;
         }
     } else {
         m_lineNumber = NULL;
