@@ -243,17 +243,13 @@ static char* xp_get_keyword_value(const char *name)
     size_t len;
 
     if (ptr && ptr[0] == '[' && (len = strlen(ptr)) && ptr[len - 1] == ']') {
-        int i = 0;
         len -= 2; /* without the brackets */
-        while (generic[i]) {
-            const char* keyword = *generic[i];
-            if (strncmp(ptr + 1, keyword, len) == 0 && strlen(keyword) == len) {
-                const char* value = *(generic[i] + 1);
-                return strdup(value);
-            }
-            ++i;
-        }
-        ERROR("%s \"%s\" looks like a keyword value, but keyword not supplied!", name, ptr);
+        std::string keyword(ptr + 1, len);
+        auto it = generic.find(keyword);
+        if (it != generic.end())
+            return strdup(it->second.c_str());
+        else
+            ERROR("%s \"%s\" looks like a keyword value, but keyword not supplied!", name, ptr);
     }
 
     return ptr ? strdup(ptr) : NULL;
