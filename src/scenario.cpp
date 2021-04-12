@@ -239,22 +239,6 @@ double get_double(const char *ptr, const char *what)
 static char* xp_get_keyword_value(const char *name)
 {
     const char* ptr = xp_get_value(name);
-    size_t len;
-
-    if (ptr && ptr[0] == '[' && (len = strlen(ptr)) && ptr[len - 1] == ']') {
-        int i = 0;
-        len -= 2; /* without the brackets */
-        while (generic[i]) {
-            const char* keyword = *generic[i];
-            if (strncmp(ptr + 1, keyword, len) == 0 && strlen(keyword) == len) {
-                const char* value = *(generic[i] + 1);
-                return strdup(value);
-            }
-            ++i;
-        }
-        ERROR("%s \"%s\" looks like a keyword value, but keyword not supplied!", name, ptr);
-    }
-
     return ptr ? strdup(ptr) : NULL;
 }
 
@@ -1665,8 +1649,8 @@ void scenario::parseAction(CActions *actions)
                 } else if (strcmp(ptr, "resume") == 0) {
                     tmpAction->setActionType(CAction::E_AT_RTP_STREAM_RESUME);
                 } else {
-                    tmpAction->setRTPStreamActInfo(ptr);
                     tmpAction->setActionType(CAction::E_AT_RTP_STREAM_PLAY);
+                    tmpAction->setMessage(ptr);
                 }
                 free(ptr);
             } else {

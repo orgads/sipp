@@ -3769,7 +3769,11 @@ call::T_ActionResult call::executeAction(const char* msg, message* curmsg)
         } else if (currentAction->getActionType() == CAction::E_AT_RTP_STREAM_RESUME) {
             rtpstream_resume(&rtpstream_callinfo);
         } else if (currentAction->getActionType() == CAction::E_AT_RTP_STREAM_PLAY) {
-            rtpstream_play(&rtpstream_callinfo, currentAction->getRTPStreamActInfo());
+            const char *fileName = createSendingMessage(currentAction->getMessage(), -2 /* do not add crlf*/);
+            rtpstream_actinfo_t *actInfo = currentAction->getRTPStreamActInfo();
+            currentAction->setRTPStreamActInfo(fileName);
+
+            rtpstream_play(&rtpstream_callinfo, actInfo);
         } else {
             ERROR("call::executeAction unknown action");
         }
