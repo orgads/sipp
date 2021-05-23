@@ -723,6 +723,16 @@ void rtpstream_resume(rtpstream_callinfo_t* callinfo)
     }
 }
 
+int rtpstream_loop_count(rtpstream_callinfo_t *callinfo)
+{
+    debugprint("rtpstream_resume callinfo=%p\n", callinfo);
+
+    if (callinfo->taskinfo) {
+        callinfo->taskinfo->new_loop_count;
+    }
+    return 0;
+}
+
 /* code checked */
 void rtpstream_shutdown(void)
 {

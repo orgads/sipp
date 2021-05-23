@@ -27,6 +27,7 @@ struct taskentry_t;
 struct rtpstream_callinfo_t
 {
     taskentry_t* taskinfo;
+    unsigned int timeout;
 };
 
 struct rtpstream_actinfo_t
@@ -50,5 +51,6 @@ int rtpstream_cache_file(char *filename);
 void rtpstream_play(rtpstream_callinfo_t *callinfo, rtpstream_actinfo_t *actioninfo);
 void rtpstream_pause(rtpstream_callinfo_t *callinfo);
 void rtpstream_resume(rtpstream_callinfo_t *callinfo);
+int rtpstream_loop_count(rtpstream_callinfo_t *callinfo);
 
 #endif

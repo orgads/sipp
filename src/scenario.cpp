@@ -1648,6 +1648,10 @@ void scenario::parseAction(CActions *actions)
                     tmpAction->setActionType(CAction::E_AT_RTP_STREAM_PAUSE);
                 } else if (strcmp(ptr, "resume") == 0) {
                     tmpAction->setActionType(CAction::E_AT_RTP_STREAM_RESUME);
+                } else if (strcmp(ptr, "wait") == 0) {
+                    tmpAction->setActionType(CAction::E_AT_RTP_STREAM_WAIT);
+                    // Abuse VarId for the timeout value
+                    tmpAction->setVarId(xp_get_long("timeout", "wait timeout", 0));
                 } else {
                     tmpAction->setActionType(CAction::E_AT_RTP_STREAM_PLAY);
                     tmpAction->setMessage(ptr);
