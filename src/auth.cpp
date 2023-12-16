@@ -92,13 +92,13 @@ static int createAuthHeaderAKAv1MD5(
 
 /* This function is from RFC 2617 Section 5 */
 
-static void hashToHex(md5_byte_t* _b_raw, unsigned char* _h)
+static void hashToHex(md5_byte_t* _b_raw, unsigned char* _h, size_t size)
 {
     unsigned short i;
     unsigned char j;
     unsigned char *_b = (unsigned char *) _b_raw;
 
-    for (i = 0; i < MD5_HASH_SIZE; i++) {
+    for (i = 0; i < size; i++) {
         j = (_b[i] >> 4) & 0xf;
         if (j <= 9) {
             _h[i * 2] = (j + '0');
@@ -112,7 +112,7 @@ static void hashToHex(md5_byte_t* _b_raw, unsigned char* _h)
             _h[i * 2 + 1] = (j + 'a' - 10);
         }
     };
-    _h[HASH_HEX_SIZE] = '\0';
+    _h[2 * size] = '\0';
 }
 
 static char *stristr(const char* s1, const char* s2)
@@ -261,7 +261,7 @@ static int createAuthResponseMD5(
     md5_append(&Md5Ctx, (md5_byte_t *) ":", 1);
     md5_append(&Md5Ctx, (md5_byte_t *) password, password_len);
     md5_finish(&Md5Ctx, ha1);
-    hashToHex(&ha1[0], &ha1_hex[0]);
+    hashToHex(&ha1[0], &ha1_hex[0], MD5_HASH_SIZE);
 
     if (auth_uri) {
         snprintf(tmp, sizeof(tmp), "sip:%s", auth_uri);
@@ -273,7 +273,7 @@ static int createAuthResponseMD5(
         md5_init(&Md5Ctx);
         md5_append(&Md5Ctx, (md5_byte_t *) msgbody, strlen(msgbody));
         md5_finish(&Md5Ctx, body);
-        hashToHex(&body[0], &body_hex[0]);
+        hashToHex(&body[0], &body_hex[0], MD5_HASH_SIZE);
     }
 
     // Load in A2
@@ -286,7 +286,7 @@ static int createAuthResponseMD5(
         md5_append(&Md5Ctx, (md5_byte_t *) &body_hex, HASH_HEX_SIZE);
     }
     md5_finish(&Md5Ctx, ha2);
-    hashToHex(&ha2[0], &ha2_hex[0]);
+    hashToHex(&ha2[0], &ha2_hex[0], MD5_HASH_SIZE);
 
     md5_init(&Md5Ctx);
     md5_append(&Md5Ctx, (md5_byte_t *) &ha1_hex, HASH_HEX_SIZE);
@@ -303,7 +303,7 @@ static int createAuthResponseMD5(
     md5_append(&Md5Ctx, (md5_byte_t *) ":", 1);
     md5_append(&Md5Ctx, (md5_byte_t *) &ha2_hex, HASH_HEX_SIZE);
     md5_finish(&Md5Ctx, resp);
-    hashToHex(&resp[0], result);
+    hashToHex(&resp[0], result, MD5_HASH_SIZE);
 
     return 1;
 }
