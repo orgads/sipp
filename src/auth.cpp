@@ -34,6 +34,12 @@
 #include "screen.hpp"
 #include "logger.hpp"
 #include "auth.hpp"
+#ifdef USE_SHA256
+#include <openssl/sha.h>
+
+#define SHA256_HASH_SIZE 32
+#define SHA256_HASH_HEX_SIZE 2*SHA256_HASH_SIZE
+#endif // USE_SHA256
 
 #define MAX_HEADER_LEN  2049
 #define MD5_HASH_SIZE 16
@@ -89,6 +95,13 @@ static int createAuthHeaderAKAv1MD5(
     const char* auth, const char* algo, unsigned int nonce_count,
     char* result, size_t result_len);
 
+#ifdef USE_SHA256
+static int createAuthHeaderSHA256(
+    const char* user, const char* password, int password_len,
+    const char* method, const char* uri, const char* msgbody,
+    const char* auth, const char* algo, unsigned int nonce_count,
+    char* result, size_t result_len);
+#endif // USE_SHA256
 
 /* This function is from RFC 2617 Section 5 */
 
@@ -185,8 +198,14 @@ int createAuthHeader(
         return createAuthHeaderAKAv1MD5(
             user, aka_OP, aka_AMF, aka_K, method, uri, msgbody, auth,
             algo, nonce_count, result, result_len);
+#ifdef USE_SHA256
+    } else if (strncasecmp(algo, "SHA-256", 7)==0) {
+        return createAuthHeaderSHA256(
+            user, password, strlen(password), method, uri, msgbody,
+            auth, algo, nonce_count, result, result_len);
+#endif // USE_SHA256
     } else {
-        snprintf(result, result_len, "createAuthHeader: authentication must use MD5 or AKAv1-MD5");
+        snprintf(result, result_len, "createAuthHeader: authentication must use MD5, AKAv1-MD5 or SHA-256");
         return 0;
     }
 
@@ -307,6 +326,78 @@ static int createAuthResponseMD5(
 
     return 1;
 }
+
+#ifdef USE_SHA256
+static int createAuthResponseSHA256(
+    const char* user, const char* password, int password_len,
+    const char* method, const char* uri, const char* authtype,
+    const char* msgbody, const char* realm, const char* nonce,
+    const char* cnonce, const char* nc,
+    unsigned char* result)
+{
+    unsigned char ha1[SHA256_HASH_SIZE], ha2[SHA256_HASH_SIZE];
+    unsigned char resp[SHA256_HASH_SIZE], body[SHA256_HASH_SIZE];
+    unsigned char body_hex[SHA256_HASH_HEX_SIZE+1];
+    unsigned char ha1_hex[SHA256_HASH_HEX_SIZE+1], ha2_hex[SHA256_HASH_HEX_SIZE+1];
+    char tmp[MAX_HEADER_LEN];
+    SHA256_CTX SHA256Ctx;
+
+    // Load in A1
+    // ha1 = SHA256(username ":" realm ":" password)
+    SHA256_Init(&SHA256Ctx);
+    SHA256_Update( &SHA256Ctx, (unsigned char *) user, strlen(user));
+    SHA256_Update( &SHA256Ctx, ":", 1);
+    SHA256_Update( &SHA256Ctx, (unsigned char *) realm, strlen(realm));
+    SHA256_Update( &SHA256Ctx, ":", 1);
+    SHA256_Update( &SHA256Ctx, (unsigned char *) password, password_len);
+    SHA256_Final(ha1, &SHA256Ctx);
+    hashToHex(&ha1[0], &ha1_hex[0], SHA256_HASH_SIZE);
+
+    if (auth_uri) {
+        snprintf(tmp, sizeof(tmp), "sip:%s", auth_uri);
+    } else {
+        strncpy(tmp, uri, sizeof(tmp) - 1);
+    }
+    // If using Auth-Int make a hash of the body - which is NULL for REG
+    if (stristr(authtype, "auth-int") != NULL) {
+        SHA256_Init(&SHA256Ctx);
+        SHA256_Update( &SHA256Ctx, (unsigned char *) msgbody, strlen(msgbody));
+        SHA256_Final(body, &SHA256Ctx);
+        hashToHex(&body[0], &body_hex[0], SHA256_HASH_SIZE);
+    }
+
+    // Load in A2
+    SHA256_Init(&SHA256Ctx);
+    SHA256_Update( &SHA256Ctx, (unsigned char *) method, strlen(method));
+    SHA256_Update( &SHA256Ctx, (unsigned char *) ":", 1);
+    SHA256_Update( &SHA256Ctx, (unsigned char *) tmp, strlen(tmp));
+    if (stristr(authtype, "auth-int") != NULL) {
+        SHA256_Update( &SHA256Ctx, (unsigned char *) ":", 1);
+        SHA256_Update( &SHA256Ctx, (unsigned char *) &body_hex, SHA256_HASH_HEX_SIZE);
+    }
+    SHA256_Final(ha2, &SHA256Ctx);
+    hashToHex(&ha2[0], &ha2_hex[0], SHA256_HASH_SIZE);
+
+    SHA256_Init(&SHA256Ctx);
+    SHA256_Update( &SHA256Ctx, (unsigned char *) &ha1_hex, SHA256_HASH_HEX_SIZE);
+    SHA256_Update( &SHA256Ctx, (unsigned char *) ":", 1);
+    SHA256_Update( &SHA256Ctx, (unsigned char *) nonce, strlen(nonce));
+    if (cnonce[0] != '\0') {
+        SHA256_Update( &SHA256Ctx, (unsigned char *) ":", 1);
+        SHA256_Update( &SHA256Ctx, (unsigned char *) nc, strlen(nc));
+        SHA256_Update( &SHA256Ctx, (unsigned char *) ":", 1);
+        SHA256_Update( &SHA256Ctx, (unsigned char *) cnonce, strlen(cnonce));
+        SHA256_Update( &SHA256Ctx, (unsigned char *) ":", 1);
+        SHA256_Update( &SHA256Ctx, (unsigned char *) authtype, strlen(authtype));
+    }
+    SHA256_Update( &SHA256Ctx, (unsigned char *) ":", 1);
+    SHA256_Update( &SHA256Ctx, (unsigned char *) &ha2_hex, SHA256_HASH_HEX_SIZE);
+    SHA256_Final(resp, &SHA256Ctx);
+    hashToHex(&resp[0], result, SHA256_HASH_SIZE);
+
+    return 1;
+}
+#endif // USE_SHA256
 
 int createAuthHeaderMD5(
     const char* user, const char* password, int password_len,
@@ -445,8 +536,31 @@ int verifyAuthHeader(const char *user, const char *password, const char *method,
                 (char*)result,
                 response);
         return !strcmp((char *)result, response);
+#ifdef USE_SHA256
+    } else if (strncasecmp(algo, "SHA-256", 7)==0) {
+        getAuthParameter("realm", auth, realm, sizeof(realm));
+        getAuthParameter("uri", auth, uri, sizeof(uri));
+        getAuthParameter("nonce", auth, nonce, sizeof(nonce));
+        getAuthParameter("cnonce", auth, cnonce, sizeof(cnonce));
+        getAuthParameter("nc", auth, nc, sizeof(nc));
+        getAuthParameter("qop", auth, authtype, sizeof(authtype));
+        createAuthResponseSHA256(
+            user, password, strlen(password), method, uri, authtype,
+            msgbody, realm, nonce, cnonce, nc, result);
+        getAuthParameter("response", auth, response, sizeof(response));
+        TRACE_CALLDEBUG("Processing verifyauth command - user %s, password %s, method %s, uri %s, realm %s, nonce %s, result expected %s, response from user %s\n",
+                user,
+                password,
+                method,
+                uri,
+                realm,
+                nonce,
+                (char*)result,
+                response);
+        return !strcmp((char *)result, response);
+#endif // USE_SHA256
     } else {
-        WARNING("createAuthHeader: authentication must use MD5 or AKAv1-MD5, value is '%s'", algo);
+        WARNING("createAuthHeader: authentication must use MD5 or SHA-256, value is '%s'", algo);
         return 0;
     }
 }
@@ -769,6 +883,102 @@ static int createAuthHeaderAKAv1MD5(
     free(nonce);
     return written;
 }
+
+#ifdef USE_SHA256
+int createAuthHeaderSHA256(
+    const char* user, const char* password, int password_len,
+    const char* method, const char* uri, const char* msgbody,
+    const char* auth, const char* algo, unsigned int nonce_count,
+    char* result, size_t result_len)
+{
+
+    unsigned char resp_hex[SHA256_HASH_HEX_SIZE+1];
+    char realm[MAX_HEADER_LEN],
+        sipuri[MAX_HEADER_LEN],
+        nonce[MAX_HEADER_LEN],
+        authtype[16],
+        cnonce[32],
+        nc[32],
+        opaque[64];
+    int has_opaque = 0;
+    int written = 0;
+
+    // Extract the Auth Type - If not present, using 'none'
+    cnonce[0] = '\0';
+    if (getAuthParameter("qop", auth, authtype, sizeof(authtype))) {
+        // Sloppy auth type recognition (may be "auth,auth-int")
+        if (stristr(authtype, "auth-int")) {
+            strncpy(authtype, "auth-int", sizeof(authtype) - 1);
+        } else if (stristr(authtype, "auth")) {
+            strncpy(authtype, "auth", sizeof(authtype) - 1);
+        }
+        sprintf(cnonce, "%x", rand());
+        sprintf(nc, "%08x", nonce_count);
+    }
+
+    // Extract the Opaque value - if present
+    if (getAuthParameter("opaque", auth, opaque, sizeof(opaque))) {
+        has_opaque = 1;
+    }
+
+    // Extract the Realm
+    if (!getAuthParameter("realm", auth, realm, sizeof(realm))) {
+        snprintf(result, result_len, "createAuthHeaderSHA256: couldn't parse realm in '%s'", auth);
+        return 0;
+    }
+
+    written += snprintf(
+        result + written, result_len - written,
+        "Digest username=\"%s\",realm=\"%s\"", user, realm);
+
+    // Construct the URI
+    if (auth_uri == NULL) {
+        snprintf(sipuri, sizeof(sipuri), "sip:%s", uri);
+    } else {
+        snprintf(sipuri, sizeof(sipuri), "sip:%s", auth_uri);
+    }
+
+    if (cnonce[0] != '\0') {
+        // No double quotes around nc and qop (RFC3261):
+        //
+        // dig-resp = username / realm / nonce / digest-uri / dresponse
+        //             / algorithm / cnonce / opaque / message-qop
+        // message-qop = "qop" EQUAL ("auth" / "auth-int" / token)
+        // nonce-count =  "nc" EQUAL 8LHEX
+        //
+        // The digest challenge does have double quotes however:
+        //
+        // digest-cln = realm / domain / nonce / opaque / stale / algorithm
+        //                / qop-options / auth-param
+        // qop-options = "qop" EQUAL LDQUOT qop-value *("," qop-value) RDQUOT
+        written += snprintf(
+            result + written, result_len - written,
+            ",cnonce=\"%s\",nc=%s,qop=%s", cnonce, nc, authtype);
+    }
+    written += snprintf(
+        result + written, result_len - written, ",uri=\"%s\"", sipuri);
+
+    // Extract the Nonce
+    if (!getAuthParameter("nonce", auth, nonce, sizeof(nonce))) {
+        snprintf(result, result_len, "createAuthHeader: couldn't parse nonce");
+        return 0;
+    }
+
+    createAuthResponseSHA256(
+        user, password, password_len, method, sipuri, authtype,
+        msgbody, realm, nonce, cnonce, nc, &resp_hex[0]);
+
+    written += snprintf(
+        result + written, result_len - written,
+        ",nonce=\"%s\",response=\"%s\",algorithm=%s", nonce, resp_hex, algo);
+    if (has_opaque) {
+        written += snprintf(
+            result + written, result_len - written, ",opaque=\"%s\"", opaque);
+    }
+
+    return written;
+}
+#endif // USE_SHA256
 
 
 #ifdef GTEST

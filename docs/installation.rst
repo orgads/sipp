@@ -103,6 +103,16 @@ Installing SIPp
         cmake . -DUSE_SCTP=1
         make
 
+    + With SHA-256 support, you must have installed `OpenSSL library`_
+      (>=0.9.8) (which may come with your system).
+      Building SIPp consists only of adding the
+      ``-DUSE_SHA256=1`` option to the cmake command::
+
+        tar -xvzf sipp-xxx.tar.gz
+        cd sipp
+        cmake . -DUSE_SHA256=1
+        make
+
     + With support for statistically distributed pauses::
 
         tar -xvzf sipp-xxx.tar.gz
