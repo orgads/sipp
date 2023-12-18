@@ -474,7 +474,7 @@ int createAuthHeaderMD5(
 
     // Extract the Nonce
     if (!getAuthParameter("nonce", auth, nonce, sizeof(nonce))) {
-        snprintf(result, result_len, "createAuthHeader: couldn't parse nonce");
+        snprintf(result, result_len, "createAuthHeaderMD5: couldn't parse nonce");
         return 0;
     }
 
@@ -960,7 +960,7 @@ int createAuthHeaderSHA256(
 
     // Extract the Nonce
     if (!getAuthParameter("nonce", auth, nonce, sizeof(nonce))) {
-        snprintf(result, result_len, "createAuthHeader: couldn't parse nonce");
+        snprintf(result, result_len, "createAuthHeaderSHA256: couldn't parse nonce");
         return 0;
     }
 
