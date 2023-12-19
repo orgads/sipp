@@ -35,7 +35,7 @@
 #include "logger.hpp"
 #include "auth.hpp"
 #ifdef USE_SHA256
-#include <openssl/sha.h>
+#include <openssl/evp.h>
 
 #define SHA256_HASH_SIZE 32
 #define SHA256_HASH_HEX_SIZE 2*SHA256_HASH_SIZE
@@ -340,17 +340,18 @@ static int createAuthResponseSHA256(
     unsigned char body_hex[SHA256_HASH_HEX_SIZE+1];
     unsigned char ha1_hex[SHA256_HASH_HEX_SIZE+1], ha2_hex[SHA256_HASH_HEX_SIZE+1];
     char tmp[MAX_HEADER_LEN];
-    SHA256_CTX SHA256Ctx;
+    unsigned int digest_len = 0;
+    EVP_MD_CTX *mdctx = EVP_MD_CTX_new();
 
     // Load in A1
     // ha1 = SHA256(username ":" realm ":" password)
-    SHA256_Init(&SHA256Ctx);
-    SHA256_Update( &SHA256Ctx, (unsigned char *) user, strlen(user));
-    SHA256_Update( &SHA256Ctx, ":", 1);
-    SHA256_Update( &SHA256Ctx, (unsigned char *) realm, strlen(realm));
-    SHA256_Update( &SHA256Ctx, ":", 1);
-    SHA256_Update( &SHA256Ctx, (unsigned char *) password, password_len);
-    SHA256_Final(ha1, &SHA256Ctx);
+    EVP_DigestInit_ex(mdctx, EVP_sha256(), NULL);
+    EVP_DigestUpdate(mdctx, (unsigned char *) user, strlen(user));
+    EVP_DigestUpdate(mdctx, ":", 1);
+    EVP_DigestUpdate(mdctx, (unsigned char *) realm, strlen(realm));
+    EVP_DigestUpdate(mdctx, ":", 1);
+    EVP_DigestUpdate(mdctx, (unsigned char *) password, password_len);
+    EVP_DigestFinal_ex(mdctx, ha1, &digest_len);
     hashToHex(&ha1[0], &ha1_hex[0], SHA256_HASH_SIZE);
 
     if (auth_uri) {
@@ -360,39 +361,39 @@ static int createAuthResponseSHA256(
     }
     // If using Auth-Int make a hash of the body - which is NULL for REG
     if (stristr(authtype, "auth-int") != NULL) {
-        SHA256_Init(&SHA256Ctx);
-        SHA256_Update( &SHA256Ctx, (unsigned char *) msgbody, strlen(msgbody));
-        SHA256_Final(body, &SHA256Ctx);
+        EVP_DigestInit_ex(mdctx, EVP_sha256(), NULL);
+        EVP_DigestUpdate(mdctx, (unsigned char *) msgbody, strlen(msgbody));
+        EVP_DigestFinal_ex(mdctx, body, &digest_len);
         hashToHex(&body[0], &body_hex[0], SHA256_HASH_SIZE);
     }
 
     // Load in A2
-    SHA256_Init(&SHA256Ctx);
-    SHA256_Update( &SHA256Ctx, (unsigned char *) method, strlen(method));
-    SHA256_Update( &SHA256Ctx, (unsigned char *) ":", 1);
-    SHA256_Update( &SHA256Ctx, (unsigned char *) tmp, strlen(tmp));
+    EVP_DigestInit_ex(mdctx, EVP_sha256(), NULL);
+    EVP_DigestUpdate(mdctx, (unsigned char *) method, strlen(method));
+    EVP_DigestUpdate(mdctx, (unsigned char *) ":", 1);
+    EVP_DigestUpdate(mdctx, (unsigned char *) tmp, strlen(tmp));
     if (stristr(authtype, "auth-int") != NULL) {
-        SHA256_Update( &SHA256Ctx, (unsigned char *) ":", 1);
-        SHA256_Update( &SHA256Ctx, (unsigned char *) &body_hex, SHA256_HASH_HEX_SIZE);
+        EVP_DigestUpdate(mdctx, (unsigned char *) ":", 1);
+        EVP_DigestUpdate(mdctx, (unsigned char *) &body_hex, SHA256_HASH_HEX_SIZE);
     }
-    SHA256_Final(ha2, &SHA256Ctx);
+    EVP_DigestFinal_ex(mdctx, ha2, &digest_len);
     hashToHex(&ha2[0], &ha2_hex[0], SHA256_HASH_SIZE);
 
-    SHA256_Init(&SHA256Ctx);
-    SHA256_Update( &SHA256Ctx, (unsigned char *) &ha1_hex, SHA256_HASH_HEX_SIZE);
-    SHA256_Update( &SHA256Ctx, (unsigned char *) ":", 1);
-    SHA256_Update( &SHA256Ctx, (unsigned char *) nonce, strlen(nonce));
+    EVP_DigestInit_ex(mdctx, EVP_sha256(), NULL);
+    EVP_DigestUpdate(mdctx, (unsigned char *) &ha1_hex, SHA256_HASH_HEX_SIZE);
+    EVP_DigestUpdate(mdctx, (unsigned char *) ":", 1);
+    EVP_DigestUpdate(mdctx, (unsigned char *) nonce, strlen(nonce));
     if (cnonce[0] != '\0') {
-        SHA256_Update( &SHA256Ctx, (unsigned char *) ":", 1);
-        SHA256_Update( &SHA256Ctx, (unsigned char *) nc, strlen(nc));
-        SHA256_Update( &SHA256Ctx, (unsigned char *) ":", 1);
-        SHA256_Update( &SHA256Ctx, (unsigned char *) cnonce, strlen(cnonce));
-        SHA256_Update( &SHA256Ctx, (unsigned char *) ":", 1);
-        SHA256_Update( &SHA256Ctx, (unsigned char *) authtype, strlen(authtype));
+        EVP_DigestUpdate(mdctx, (unsigned char *) ":", 1);
+        EVP_DigestUpdate(mdctx, (unsigned char *) nc, strlen(nc));
+        EVP_DigestUpdate(mdctx, (unsigned char *) ":", 1);
+        EVP_DigestUpdate(mdctx, (unsigned char *) cnonce, strlen(cnonce));
+        EVP_DigestUpdate(mdctx, (unsigned char *) ":", 1);
+        EVP_DigestUpdate(mdctx, (unsigned char *) authtype, strlen(authtype));
     }
-    SHA256_Update( &SHA256Ctx, (unsigned char *) ":", 1);
-    SHA256_Update( &SHA256Ctx, (unsigned char *) &ha2_hex, SHA256_HASH_HEX_SIZE);
-    SHA256_Final(resp, &SHA256Ctx);
+    EVP_DigestUpdate(mdctx, (unsigned char *) ":", 1);
+    EVP_DigestUpdate(mdctx, (unsigned char *) &ha2_hex, SHA256_HASH_HEX_SIZE);
+    EVP_DigestFinal_ex(mdctx, resp, &digest_len);
     hashToHex(&resp[0], result, SHA256_HASH_SIZE);
 
     return 1;
