@@ -34,12 +34,16 @@
 #include "screen.hpp"
 #include "logger.hpp"
 #include "auth.hpp"
-#ifdef USE_SHA256
+#if defined(USE_OPENSSL)
 #include <openssl/evp.h>
+#elif defined(USE_WOLFSSL)
+#include <wolfssl/openssl/evp.h>
+#endif
 
+#if defined(USE_OPENSSL) || defined(USE_WOLFSSL)
 #define SHA256_HASH_SIZE 32
 #define SHA256_HASH_HEX_SIZE 2*SHA256_HASH_SIZE
-#endif // USE_SHA256
+#endif
 
 #define MAX_HEADER_LEN  2049
 #define MD5_HASH_SIZE 16
