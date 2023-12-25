@@ -95,7 +95,7 @@ endif(NOT USE_PCAP)
 find_package(PkgConfig QUIET)  # import pkg_check_modules() and friends
 if(USE_SSL)
   if(PKG_CONFIG_FOUND)
-    pkg_search_module(SSL openssl>=0.9.8 wolfssl>=3.15.0)
+    pkg_search_module(SSL openssl>=1.1.0 wolfssl>=3.15.0)
   endif()
   if(SSL_FOUND)
     if("${SSL_LIBRARIES}" MATCHES "wolfssl")
