@@ -40,10 +40,10 @@
 #include <wolfssl/openssl/evp.h>
 #endif
 
-#if defined(USE_OPENSSL) || defined(USE_WOLFSSL)
+#ifdef USE_SHA256
 #define SHA256_HASH_SIZE 32
 #define SHA256_HASH_HEX_SIZE 2*SHA256_HASH_SIZE
-#endif
+#endif // USE_SHA256
 
 #define MAX_HEADER_LEN  2049
 #define MD5_HASH_SIZE 16
