@@ -501,8 +501,6 @@ int createAuthHeaderMD5(
 int verifyAuthHeader(const char *user, const char *password, const char *method, const char *auth, const char *msgbody)
 {
     char algo[MAX_HEADER_LEN];
-    unsigned char result[HASH_HEX_SIZE + 1];
-    char response[HASH_HEX_SIZE + 1];
     char realm[MAX_HEADER_LEN];
     char nonce[MAX_HEADER_LEN];
     char cnonce[MAX_HEADER_LEN];
@@ -521,6 +519,8 @@ int verifyAuthHeader(const char *user, const char *password, const char *method,
         strcpy(algo, "MD5");
     }
     if (strncasecmp(algo, "MD5", 3)==0) {
+        unsigned char result[HASH_HEX_SIZE + 1];
+        char response[HASH_HEX_SIZE + 1];
         getAuthParameter("realm", auth, realm, sizeof(realm));
         getAuthParameter("uri", auth, uri, sizeof(uri));
         getAuthParameter("nonce", auth, nonce, sizeof(nonce));
@@ -543,6 +543,8 @@ int verifyAuthHeader(const char *user, const char *password, const char *method,
         return !strcmp((char *)result, response);
 #ifdef USE_SHA256
     } else if (strncasecmp(algo, "SHA-256", 7)==0) {
+        unsigned char result[SHA256_HASH_HEX_SIZE + 1];
+        char response[SHA256_HASH_HEX_SIZE + 1];
         getAuthParameter("realm", auth, realm, sizeof(realm));
         getAuthParameter("uri", auth, uri, sizeof(uri));
         getAuthParameter("nonce", auth, nonce, sizeof(nonce));
