@@ -1023,6 +1023,20 @@ TEST(DigestAuth, BasicVerification) {
     free(header);
 }
 
+#if defined(USE_SHA256)
+TEST(DigestAuth, BasicVerificationSHA256) {
+    char* header = strdup(("Digest \r\n"
+                           " realm=\"testrealm@host.com\",\r\n"
+                           " nonce=\"ZaGxV2WhsCtREI2EsiD1LR0RYd\"\r\n,"
+                           " algorithm=SHA-256"));
+    char result[255];
+    createAuthHeader("testuser", "secret", "REGISTER", "sip:example.com", "hello world", header, NULL, NULL, NULL, 1, result, 255);
+    EXPECT_STREQ("Digest username=\"testuser\",realm=\"testrealm@host.com\",uri=\"sip:sip:example.com\",nonce=\"ZaGxV2WhsCtREI2EsiD1LR0RYd\",response=\"91b58523b983191b52d14455a2599631990110c974ed2e4b4b49bc6053af04ce\",algorithm=SHA-256", result);
+    EXPECT_EQ(1, verifyAuthHeader("testuser", "secret", "REGISTER", result, "hello world"));
+    free(header);
+}
+#endif
+
 TEST(DigestAuth, qop) {
     char result[1024];
     char* header = strdup(("Digest \r\n"
