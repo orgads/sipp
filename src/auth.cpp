@@ -565,7 +565,7 @@ int verifyAuthHeader(const char *user, const char *password, const char *method,
         return !strcmp((char *)result, response);
 #endif // USE_SHA256
     } else {
-        WARNING("createAuthHeader: authentication must use MD5 or SHA-256, value is '%s'", algo);
+        WARNING("verifyAuthHeader: authentication must use MD5 or SHA-256, value is '%s'", algo);
         return 0;
     }
 }
