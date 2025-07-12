@@ -39,18 +39,21 @@
  */
 
 #include <algorithm>
+#include <array>
+#include <charconv>
 #include <cstring>
 #include <fstream>
 #include <iostream>
 #include <iterator>
 #include <sstream>
 #include <vector>
+#include <string>
+#include <string_view>
 
 #include <assert.h>
 #include <stdarg.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <string>
 
 #ifdef PCAPPLAY
 #include "send_packets.h"
@@ -79,22 +82,24 @@ std::vector<std::string> split(const std::string &s, char delim) {
     return elems;
 }
 
-std::string join(const std::vector<std::string> &s, const char* delim) {
+std::string join(const std::vector<std::string> &s, std::string_view delim) {
+    if (s.empty()) return "";
+
     std::ostringstream imploded;
-    std::copy(s.begin(), s.end(), std::ostream_iterator<std::string>(imploded, delim));
-    std::string ret = imploded.str();
-    if (ret.length()) {
-        ret.resize(ret.length() - strlen(delim));
+    auto it = s.begin();
+    imploded << *it++;
+    for (; it != s.end(); ++it) {
+        imploded << delim << *it;
     }
-    return ret;
+    return imploded.str();
 }
 
-std::string trim(const std::string &s) {
-    size_t first = s.find_first_not_of(' ');
-    if (first == std::string::npos) {
-        return s;
+std::string_view trim(std::string_view s) {
+    const size_t first = s.find_first_not_of(' ');
+    if (first == std::string_view::npos) {
+        return "";
     }
-    size_t last = s.find_last_not_of(' ');
+    const size_t last = s.find_last_not_of(' ');
     return s.substr(first, (last - first + 1));
 }
 
@@ -223,109 +228,89 @@ void call::get_remote_media_addr(std::string const &msg)
 #define SDP_VIDEOPORT_PREFIX "\nm=video"
 std::string call::extract_rtp_remote_addr(const char* msg, int &ip_ver, int &audio_port, int &video_port)
 {
-    const char* search;
-    int image_port = 0;
-    std::size_t pos1 = 0;
-    std::size_t pos2 = 0;
-    std::string msgstr;
-    std::string sub;
+    if (!msg) {
+        ERROR("extract_rtp_remote_addr: null message");
+        return "";
+    }
+
     std::string host;
 
-    if (msg) {
-        msgstr = msg;
-    }
-
     /* Look for start of message body */
-    search = strstr(msg, "\r\n\r\n");
+    const char* search = strstr(msg, "\r\n\r\n");
     if (!search) {
         ERROR("extract_rtp_remote_addr: SDP message body not found");
+        return "";
     }
-    msg = search + 2; /* skip past header. point to blank line before body */
+    const char* body = search + 4; /* skip past header and double CRLF */
+    std::string_view msgview(body);
 
     /* Now search for IP address field */
-    host = find_in_sdp("c=IN IP4 ", msg);
+    host = find_in_sdp("c=IN IP4 ", body);
     if (host.empty()) {
-        host = find_in_sdp("c=IN IP6 ", msg);
+        host = find_in_sdp("c=IN IP6 ", body);
         if (host.empty()) {
             ERROR("extract_rtp_remote_addr: invalid IP version in SDP message body");
+            return "";
         }
         ip_ver = 6;
     } else {
         ip_ver = 4;
     }
 
-    /* Find the port number for the image stream */
-    pos1 = msgstr.find(SDP_IMAGEPORT_PREFIX, 0, 8);
-    if (pos1 != std::string::npos)
-    {
-        pos1 += 8; /* skip SDP_IMAGEPORT_PREFIX */
-        pos1 += 1; /* skip first whitespace */
-        pos2 = msgstr.find(" ", pos1); /* find second whitespace AFTER port */
-        if (pos2 != std::string::npos)
-        {
-            sub = msgstr.substr(pos1, pos2-pos1); /* extract port substring */
-            sscanf(sub.c_str(), "%d", &image_port); /* parse port substring as integer */
-        }
-    }
+    auto extract_port = [&msgview](std::string_view prefix) -> int {
+        const size_t pos1 = msgview.find(prefix);
+        if (pos1 == std::string_view::npos) return 0;
 
-    /* Now try to find the port number for the audio stream */
-    pos1 = msgstr.find(SDP_AUDIOPORT_PREFIX, 0, 8);
-    if (pos1 != std::string::npos)
-    {
-        pos1 += 8; /* skip SDP_AUDIOPORT_PREFIX */
-        pos1 += 1; /* skip first whitespace */
-        pos2 = msgstr.find(" ", pos1); /* find second whitespace AFTER port */
-        if (pos2 != std::string::npos)
-        {
-            sub = msgstr.substr(pos1, pos2-pos1); /* extract port substring */
-            sscanf(sub.c_str(), "%d", &audio_port); /* parse port substring as integer */
-        }
-    }
+        const size_t port_start = pos1 + prefix.length() + 1; // skip prefix and whitespace
+        const size_t port_end = msgview.find(' ', port_start);
+        if (port_end == std::string_view::npos) return 0;
 
-    /* first audio m-line had port of ZERO -- look for second audio m-line */
-    if (audio_port == 0)
-    {
-        pos1 = msgstr.find(SDP_AUDIOPORT_PREFIX, pos2, 8);
-        if (pos1 != std::string::npos)
-        {
-            pos1 += 8; /* skip SDP_AUDIOPORT_PREFIX  */
-            pos1 += 1; /* skip first whitespace */
-            pos2 = msgstr.find(" ", pos1); /* find second whitespace AFTER port */
-            if (pos2 != std::string::npos)
-            {
-                sub = msgstr.substr(pos1, pos2-pos1); /* extract port substring */
-                sscanf(sub.c_str(), "%d", &audio_port);
+        const std::string_view port_str = msgview.substr(port_start, port_end - port_start);
+        int port = 0;
+        const auto result = std::from_chars(port_str.data(), port_str.data() + port_str.size(), port);
+        return (result.ec == std::errc{}) ? port : 0;
+    };
+
+    /* Find the port number for the audio stream */
+    audio_port = extract_port(SDP_AUDIOPORT_PREFIX + 1); // skip the \n
+
+    /* If first audio m-line had port of ZERO, look for second audio m-line */
+    if (audio_port == 0) {
+        const size_t first_audio_pos = msgview.find(SDP_AUDIOPORT_PREFIX + 1);
+        if (first_audio_pos != std::string_view::npos) {
+            const std::string_view remaining = msgview.substr(first_audio_pos + 8);
+            const size_t second_pos = remaining.find(SDP_AUDIOPORT_PREFIX + 1);
+            if (second_pos != std::string_view::npos) {
+                const std::string_view second_remaining = remaining.substr(second_pos);
+                const size_t port_start = 8 + 1; // skip prefix and whitespace
+                const size_t port_end = second_remaining.find(' ', port_start);
+                if (port_end != std::string_view::npos) {
+                    const std::string_view port_str = second_remaining.substr(port_start, port_end - port_start);
+                    const auto result = std::from_chars(port_str.data(), port_str.data() + port_str.size(), audio_port);
+                    if (result.ec != std::errc{}) audio_port = 0;
+                }
             }
         }
     }
 
-    /* And find the port number for the video stream */
-    pos1 = msgstr.find(SDP_VIDEOPORT_PREFIX, 0, 8);
-    if (pos1 != std::string::npos)
-    {
-        pos1 += 8; /* skip SDP_VIDEOPORT_PREFIX */
-        pos1 += 1; /* skip first whitespace */
-        pos2 = msgstr.find(" ", pos1); /* find second whitespace AFTER port */
-        if (pos2 != std::string::npos)
-        {
-            sub = msgstr.substr(pos1, pos2-pos1); /* extract port substring */
-           sscanf(sub.c_str(), "%d", &video_port); /* parse port substring as integer */
-        }
-    }
+    /* Find the port number for the video stream */
+    video_port = extract_port(SDP_VIDEOPORT_PREFIX + 1); // skip the \n
 
-    /* first video m-line had port of ZERO -- look for second video m-line */
-    if (video_port == 0)
-    {
-        pos1 = msgstr.find(SDP_VIDEOPORT_PREFIX, pos2, 8);
-        if (pos1 != std::string::npos)
-        {
-            pos1 += 8; /* skip SDP_VIDEOPORT_PREFIX  */
-            pos1 += 1; /* skip first whitespace */
-            pos2 = msgstr.find(" ", pos1); /* find second whitespace AFTER port */
-            if (pos2 != std::string::npos)
-            {
-                sub = msgstr.substr(pos1, pos2-pos1); /* extract port substring */
-                sscanf(sub.c_str(), "%d", &video_port);
+    /* If first video m-line had port of ZERO, look for second video m-line */
+    if (video_port == 0) {
+        const size_t first_video_pos = msgview.find(SDP_VIDEOPORT_PREFIX + 1);
+        if (first_video_pos != std::string_view::npos) {
+            const std::string_view remaining = msgview.substr(first_video_pos + 8);
+            const size_t second_pos = remaining.find(SDP_VIDEOPORT_PREFIX + 1);
+            if (second_pos != std::string_view::npos) {
+                const std::string_view second_remaining = remaining.substr(second_pos);
+                const size_t port_start = 8 + 1; // skip prefix and whitespace
+                const size_t port_end = second_remaining.find(' ', port_start);
+                if (port_end != std::string_view::npos) {
+                    const std::string_view port_str = second_remaining.substr(port_start, port_end - port_start);
+                    const auto result = std::from_chars(port_str.data(), port_str.data() + port_str.size(), video_port);
+                    if (result.ec != std::errc{}) video_port = 0;
+                }
             }
         }
     }
@@ -336,68 +321,82 @@ std::string call::extract_rtp_remote_addr(const char* msg, int &ip_ver, int &aud
 #ifdef USE_TLS
 int call::check_audio_ciphersuite_match(SrtpAudioInfoParams &pA)
 {
-    int audio_cs_len = 0;
-    int audio_ciphersuite_match = 0;
+    static constexpr std::array<std::string_view, 4> valid_suites = {
+        "AES_CM_128_HMAC_SHA1_80",
+        "AES_CM_128_HMAC_SHA1_32",
+        "NULL_HMAC_SHA1_80",
+        "NULL_HMAC_SHA1_32"
+    };
 
     logSrtpInfo("call::check_audio_ciphersuite_match():  Preferred AUDIO cryptosuite: [%s]\n", _pref_audio_cs_out);
 
-    if (pA.audio_found)
-    {
-        audio_cs_len = strlen(_pref_audio_cs_out);
-        if (!strncmp(_pref_audio_cs_out, "AES_CM_128_HMAC_SHA1_80", audio_cs_len) ||
-            !strncmp(_pref_audio_cs_out, "AES_CM_128_HMAC_SHA1_32", audio_cs_len) ||
-            !strncmp(_pref_audio_cs_out, "NULL_HMAC_SHA1_80", audio_cs_len) ||
-            !strncmp(_pref_audio_cs_out, "NULL_HMAC_SHA1_32", audio_cs_len))
-        {
-            if (!strncmp(pA.primary_audio_cryptosuite, _pref_audio_cs_out, audio_cs_len))
-            {
-                // PRIMARY AUDIO cryptosuite matches preferred AUDIO cryptosuite
-                logSrtpInfo("call::check_audio_ciphersuite_match():  PRIMARY AUDIO cryptosuite matches preferred AUDIO cryptosuite...\n");
-                audio_ciphersuite_match = 1;
-            }
-            else
-            {
-                // PRIMARY AUDIO cryptosuite does NOT match preferred AUDIO cryptosuite
-                logSrtpInfo("call::check_audio_ciphersuite_match():  PRIMARY AUDIO cryptosuite [%s] does NOT match preferred AUDIO cryptosuite [%s]...\n", pA.primary_audio_cryptosuite, _pref_audio_cs_out);
-                audio_ciphersuite_match = 0;
-            }
-        }
+    if (!pA.audio_found) {
+        return 0;
     }
 
-    return audio_ciphersuite_match;
+    const std::string_view pref_suite(_pref_audio_cs_out);
+    const std::string_view primary_suite(pA.primary_audio_cryptosuite);
+
+    // Check if preferred suite is valid
+    const bool is_valid = std::any_of(valid_suites.begin(), valid_suites.end(),
+                                      [pref_suite](std::string_view suite) {
+                                          return pref_suite == suite;
+                                      });
+
+    if (!is_valid) {
+        return 0;
+    }
+
+    if (primary_suite == pref_suite) {
+        // PRIMARY AUDIO cryptosuite matches preferred AUDIO cryptosuite
+        logSrtpInfo("call::check_audio_ciphersuite_match():  PRIMARY AUDIO cryptosuite matches preferred AUDIO cryptosuite...\n");
+        return 1;
+    } else {
+        // PRIMARY AUDIO cryptosuite does NOT match preferred AUDIO cryptosuite
+        logSrtpInfo("call::check_audio_ciphersuite_match():  PRIMARY AUDIO cryptosuite [%s] does NOT match preferred AUDIO cryptosuite [%s]...\n",
+                   pA.primary_audio_cryptosuite, _pref_audio_cs_out);
+        return 0;
+    }
 }
 
 int call::check_video_ciphersuite_match(SrtpVideoInfoParams &pV)
 {
-    int video_cs_len = 0;
-    int video_ciphersuite_match = 0;
+    static constexpr std::array<std::string_view, 4> valid_suites = {
+        "AES_CM_128_HMAC_SHA1_80",
+        "AES_CM_128_HMAC_SHA1_32",
+        "NULL_HMAC_SHA1_80",
+        "NULL_HMAC_SHA1_32"
+    };
 
     logSrtpInfo("call::check_video_ciphersuite_match():  Preferred VIDEO cryptosuite: [%s]\n", _pref_video_cs_out);
 
-    if (pV.video_found)
-    {
-        video_cs_len = strlen(_pref_video_cs_out);
-        if (!strncmp(_pref_video_cs_out, "AES_CM_128_HMAC_SHA1_80", video_cs_len) ||
-            !strncmp(_pref_video_cs_out, "AES_CM_128_HMAC_SHA1_32", video_cs_len) ||
-            !strncmp(_pref_video_cs_out, "NULL_HMAC_SHA1_80", video_cs_len) ||
-            !strncmp(_pref_video_cs_out, "NULL_HMAC_SHA1_32", video_cs_len))
-        {
-            if (!strncmp(pV.primary_video_cryptosuite, _pref_video_cs_out, video_cs_len))
-            {
-                // PRIMARY VIDEO cryptosuite matches preferred VIDEO cryptosuite
-                logSrtpInfo("call::check_video_ciphersuite_match():  PRIMARY VIDEO cryptosuite matches preferred VIDEO cryptosuite...\n");
-                video_ciphersuite_match = 1;
-            }
-            else
-            {
-                // PRIMARY VIDEO cryptosuite does NOT match preferred VIDEO cryptosuite
-                logSrtpInfo("call::check_video_ciphersuite_match():  PRIMARY VIDEO cryptosuite [%s] does NOT match preferred VIDEO cryptosuite [%s]...\n", pV.primary_video_cryptosuite, _pref_video_cs_out);
-                video_ciphersuite_match = 0;
-            }
-        }
+    if (!pV.video_found) {
+        return 0;
     }
 
-    return video_ciphersuite_match;
+    const std::string_view pref_suite(_pref_video_cs_out);
+    const std::string_view primary_suite(pV.primary_video_cryptosuite);
+
+    // Check if preferred suite is valid
+    const bool is_valid = std::any_of(valid_suites.begin(), valid_suites.end(),
+                                      [pref_suite](std::string_view suite) {
+                                          return pref_suite == suite;
+                                      });
+
+    if (!is_valid) {
+        return 0;
+    }
+
+    if (primary_suite == pref_suite) {
+        // PRIMARY VIDEO cryptosuite matches preferred VIDEO cryptosuite
+        logSrtpInfo("call::check_video_ciphersuite_match():  PRIMARY VIDEO cryptosuite matches preferred VIDEO cryptosuite...\n");
+        return 1;
+    } else {
+        // PRIMARY VIDEO cryptosuite does NOT match preferred VIDEO cryptosuite
+        logSrtpInfo("call::check_video_ciphersuite_match():  PRIMARY VIDEO cryptosuite [%s] does NOT match preferred VIDEO cryptosuite [%s]...\n",
+                   pV.primary_video_cryptosuite, _pref_video_cs_out);
+        return 0;
+    }
 }
 
 /******* Extract SRTP remote media infomartion from SDP  *******/
@@ -742,39 +741,53 @@ int call::extract_srtp_remote_info(const char * msg, SrtpAudioInfoParams &pA, Sr
 unsigned long call::hash(const char * msg)
 {
     unsigned long hash = 0;
-    int c;
 
     if (rtcheck == RTCHECK_FULL) {
-        while ((c = *msg++))
-            hash = c + (hash << 6) + (hash << 16) - hash;
+        // Use string_view for better performance
+        const std::string_view msg_view(msg);
+        for (char c : msg_view) {
+            hash = static_cast<unsigned char>(c) + (hash << 6) + (hash << 16) - hash;
+        }
     } else if (rtcheck == RTCHECK_LOOSE) {
         /* Based on section 11.5 (bullet 2) of RFC2543 we only take into account
          * the To, From, Call-ID, and CSeq values. */
-        const char *hdr = get_header_content(msg, "To:");
-        while ((c = *hdr++))
-            hash = c + (hash << 6) + (hash << 16) - hash;
-        hdr = get_header_content(msg, "From:");
-        while ((c = *hdr++))
-            hash = c + (hash << 6) + (hash << 16) - hash;
-        hdr = get_header_content(msg, "Call-ID:");
-        while ((c = *hdr++))
-            hash = c + (hash << 6) + (hash << 16) - hash;
-        hdr = get_header_content(msg, "CSeq:");
-        while ((c = *hdr++))
-            hash = c + (hash << 6) + (hash << 16) - hash;
+        auto hash_header = [&hash](const char* header_content) {
+            if (header_content) {
+                const std::string_view hdr_view(header_content);
+                for (char c : hdr_view) {
+                    hash = static_cast<unsigned char>(c) + (hash << 6) + (hash << 16) - hash;
+                }
+            }
+        };
+
+        hash_header(get_header_content(msg, "To:"));
+        hash_header(get_header_content(msg, "From:"));
+        hash_header(get_header_content(msg, "Call-ID:"));
+        hash_header(get_header_content(msg, "CSeq:"));
+
         /* For responses, we should also consider the code and body (if any),
          * because they are not nearly as well defined as the request retransmission. */
-        if (!strncmp(msg, "SIP/2.0", strlen("SIP/2.0"))) {
+        constexpr std::string_view sip_prefix("SIP/2.0");
+        const std::string_view msg_view(msg);
+        if (msg_view.size() >= sip_prefix.size() && msg_view.substr(0, sip_prefix.size()) == sip_prefix) {
             /* Add the first line into the hash. */
-            hdr = msg + strlen("SIP/2.0");
-            while ((c = *hdr++) && (c != '\r'))
-                hash = c + (hash << 6) + (hash << 16) - hash;
+            const size_t first_line_start = sip_prefix.length();
+            const size_t cr_pos = msg_view.find('\r', first_line_start);
+            if (cr_pos != std::string_view::npos) {
+                const std::string_view first_line = msg_view.substr(first_line_start, cr_pos - first_line_start);
+                for (char c : first_line) {
+                    hash = static_cast<unsigned char>(c) + (hash << 6) + (hash << 16) - hash;
+                }
+            }
+
             /* Add the body (if any) into the hash. */
-            hdr = strstr(msg, "\r\n\r\n");
-            if (hdr) {
-                hdr += strlen("\r\n\r\n");
-                while ((c = *hdr++))
-                    hash = c + (hash << 6) + (hash << 16) - hash;
+            constexpr std::string_view header_end("\r\n\r\n");
+            const size_t body_start = msg_view.find(header_end);
+            if (body_start != std::string_view::npos) {
+                const std::string_view body = msg_view.substr(body_start + header_end.length());
+                for (char c : body) {
+                    hash = static_cast<unsigned char>(c) + (hash << 6) + (hash << 16) - hash;
+                }
             }
         }
     } else {
@@ -1130,31 +1143,42 @@ bool call::checkAckCSeq(const char* msg)
 
 int call::_callDebug(const char *fmt, ...)
 {
-    va_list ap;
-
     if (!useCallDebugf) {
         return 0;
     }
 
-    /* First we figure out how much to allocate. */
-    va_start(ap, fmt);
-    int ret = vsnprintf(nullptr, 0, fmt, ap);
-    va_end(ap);
-
-    debugBuffer = (char *)realloc(debugBuffer, debugLength + ret + TIME_LENGTH + 2);
-    if (!debugBuffer) {
-        ERROR("Could not allocate buffer (%d bytes) for callDebug file!", debugLength + ret + TIME_LENGTH + 2);
-    }
-
+    // Format the timestamp
     struct timeval now;
     gettimeofday(&now, nullptr);
-    debugLength += snprintf(debugBuffer + debugLength, TIME_LENGTH + 2, "%s ", CStat::formatTime(&now, rfc3339));
+    const std::string timestamp = std::string(CStat::formatTime(&now, rfc3339)) + " ";
 
+    // Format the message
+    va_list ap;
     va_start(ap, fmt);
-    debugLength += vsnprintf(debugBuffer + debugLength, ret + 1, fmt, ap);
+    const int msg_size = vsnprintf(nullptr, 0, fmt, ap);
     va_end(ap);
 
-    return ret;
+    std::string formatted_msg(msg_size, '\0');
+    va_start(ap, fmt);
+    vsnprintf(formatted_msg.data(), msg_size + 1, fmt, ap);
+    va_end(ap);
+
+    // Append to debug buffer using std::string approach
+    const std::string new_content = timestamp + formatted_msg;
+
+    // Resize buffer to accommodate new content
+    const size_t new_size = debugLength + new_content.length();
+    debugBuffer = static_cast<char*>(realloc(debugBuffer, new_size + 1));
+    if (!debugBuffer) {
+        ERROR("Could not allocate buffer (%zu bytes) for callDebug file!", new_size + 1);
+    }
+
+    // Copy new content to buffer
+    std::memcpy(debugBuffer + debugLength, new_content.c_str(), new_content.length());
+    debugLength += new_content.length();
+    debugBuffer[debugLength] = '\0';
+
+    return msg_size;
 }
 
 call::~call()
@@ -1573,43 +1597,28 @@ char * call::get_last_header(const char * name)
  * empty string.  The caller must free the result. */
 char * call::get_last_request_uri()
 {
-    char * tmp;
-    char * tmp2;
-    char * last_request_uri;
-    int tmp_len;
-
     char * last_To = get_last_header("To:");
     if (!last_To) {
         return strdup("");
     }
 
-    tmp = strchr(last_To, '<');
-    if (!tmp) {
-        return strdup("");
-    }
-    tmp++;
-
-    tmp2 = strchr(last_To, '>');
-    if (!tmp2) {
+    const std::string_view to_header(last_To);
+    const size_t start_pos = to_header.find('<');
+    if (start_pos == std::string_view::npos) {
         return strdup("");
     }
 
-    tmp_len = strlen(tmp) - strlen(tmp2);
-    if (tmp_len < 0) {
+    const size_t end_pos = to_header.find('>', start_pos);
+    if (end_pos == std::string_view::npos) {
         return strdup("");
     }
 
-    if (!(last_request_uri = (char *)malloc(tmp_len + 1))) {
-        ERROR("Cannot allocate!");
+    if (end_pos <= start_pos + 1) {
+        return strdup("");
     }
 
-    last_request_uri[0] = '\0';
-    if (tmp_len > 0) {
-        memcpy(last_request_uri, tmp, tmp_len);
-    }
-    last_request_uri[tmp_len] = '\0';
-
-    return last_request_uri;
+    const std::string_view uri = to_header.substr(start_pos + 1, end_pos - start_pos - 1);
+    return strdup(std::string(uri).c_str());
 }
 
 char * call::send_scene(int index, int *send_status, int *len)
@@ -1985,16 +1994,16 @@ bool call::executeMessage(message *curmsg)
 
         last_send_index = curmsg->index;
         last_send_len = msgLen;
-        realloc_ptr = (char *) realloc(last_send_msg, msgLen+1);
+        realloc_ptr = static_cast<char*>(realloc(last_send_msg, msgLen + 1));
         if (realloc_ptr) {
             last_send_msg = realloc_ptr;
+            std::memcpy(last_send_msg, msg_snd, msgLen);
+            last_send_msg[msgLen] = '\0';
         } else {
             free(last_send_msg);
             ERROR("Out of memory!");
             return false;
         }
-        memcpy(last_send_msg, msg_snd, msgLen);
-        last_send_msg[msgLen] = '\0';
 
         if (curmsg->start_txn) {
             transactions[curmsg->start_txn - 1].txnID = (char *)realloc(transactions[curmsg->start_txn - 1].txnID, MAX_HEADER_LEN);
@@ -2388,16 +2397,16 @@ bool call::process_unexpected(const char* msg)
         }
 
         // usage of last_ keywords => for call aborting
-        realloc_ptr = (char *) realloc(last_recv_msg, strlen(msg) + 1);
+        const size_t msg_len = strlen(msg);
+        realloc_ptr = static_cast<char*>(realloc(last_recv_msg, msg_len + 1));
         if (realloc_ptr) {
             last_recv_msg = realloc_ptr;
+            std::memcpy(last_recv_msg, msg, msg_len + 1); // +1 for null terminator
         } else {
             free(last_recv_msg);
             ERROR("Out of memory!");
             return false;
         }
-
-        strcpy(last_recv_msg, msg);
 
         computeStat(CStat::E_CALL_FAILED);
         computeStat(CStat::E_FAILED_UNEXPECTED_MSG);
@@ -4350,22 +4359,36 @@ void call::extract_transaction(char* txn, const char* msg)
 
 void call::formatNextReqUrl(const char* contact)
 {
-    /* clean up the next_req_url */
-    while (*contact != '\0' && (*contact == ' ' || *contact == '\t')) {
-        ++contact;
-    }
-    const char* start = strchr(contact, '<');
-    const char* end = strchr(contact, '>');
-    if ((start && end)  && (start < end)) {
-        contact = start;
-        contact++;
+    if (!contact) {
         next_req_url[0] = '\0';
-        strncat(next_req_url, contact,
-                std::min(MAX_HEADER_LEN - 1, (int)(end - contact))); /* fits MAX_HEADER_LEN */
+        return;
+    }
+
+    const std::string_view contact_view(contact);
+
+    /* Skip leading whitespace */
+    size_t start_pos = 0;
+    while (start_pos < contact_view.length() &&
+           (contact_view[start_pos] == ' ' || contact_view[start_pos] == '\t')) {
+        ++start_pos;
+    }
+
+    const std::string_view trimmed = contact_view.substr(start_pos);
+    const size_t bracket_start = trimmed.find('<');
+    const size_t bracket_end = trimmed.find('>');
+
+    std::string_view url_part;
+    if (bracket_start != std::string_view::npos &&
+        bracket_end != std::string_view::npos &&
+        bracket_start < bracket_end) {
+        url_part = trimmed.substr(bracket_start + 1, bracket_end - bracket_start - 1);
     } else {
-        next_req_url[0] = '\0';
-        strncat(next_req_url, contact, MAX_HEADER_LEN - 1);
+        url_part = trimmed;
     }
+
+    const size_t copy_len = std::min(static_cast<size_t>(MAX_HEADER_LEN - 1), url_part.length());
+    std::memcpy(next_req_url, url_part.data(), copy_len);
+    next_req_url[copy_len] = '\0';
 }
 
 void call::computeRouteSetAndRemoteTargetUri(const char* rr, const char* contact, bool bRequestIncoming)
@@ -4415,20 +4438,21 @@ void call::computeRouteSetAndRemoteTargetUri(const char* rr, const char* contact
             targetUri = header;
         } else {
             first = false;
-            routes.push_back(trim(header));
+            routes.push_back(std::string(trim(header)));
         }
     }
 
     /* If target URI is set, the first hop is a strict router.  Add the
      * Contact as tailing route. */
     if (targetUri.length()) {
-        routes.push_back(trim(contact));
+        routes.push_back(std::string(trim(contact)));
     } else {
         targetUri = contact;
     }
 
     if (routes.size()) {
-        dialog_route_set = strdup(join(routes, ", ").c_str());
+        const std::string route_string = join(routes, ", ");
+        dialog_route_set = strdup(route_string.c_str());
     }
 
     formatNextReqUrl(targetUri.c_str());
@@ -4501,7 +4525,17 @@ bool call::matches_scenario(unsigned int index, int reply_code, char * request, 
 void call::queue_up(const char* msg)
 {
     free(queued_msg);
-    queued_msg = strdup(msg);
+    if (msg) {
+        const size_t msg_len = strlen(msg);
+        queued_msg = static_cast<char*>(malloc(msg_len + 1));
+        if (queued_msg) {
+            std::memcpy(queued_msg, msg, msg_len + 1);
+        } else {
+            ERROR("Out of memory!");
+        }
+    } else {
+        queued_msg = nullptr;
+    }
 }
 
 bool call::process_incoming(const char* msg, const struct sockaddr_storage* src)
@@ -5219,16 +5253,18 @@ bool call::process_incoming(const char* msg, const struct sockaddr_storage* src)
         /* It is a response: update peer_tag */
         ptr = get_peer_tag(msg);
         if (ptr) {
-            if(strlen(ptr) > (MAX_HEADER_LEN - 1)) {
+            const size_t ptr_len = strlen(ptr);
+            if (ptr_len > (MAX_HEADER_LEN - 1)) {
                 ERROR("Peer tag too long. Change MAX_HEADER_LEN and recompile sipp");
             }
-            if(peer_tag) {
+            if (peer_tag) {
                 free(peer_tag);
             }
-            peer_tag = strdup(ptr);
+            peer_tag = static_cast<char*>(malloc(ptr_len + 1));
             if (!peer_tag) {
                 ERROR("Out of memory allocating peer tag.");
             }
+            std::memcpy(peer_tag, ptr, ptr_len + 1);
         }
         request[0] = 0;
         // extract the cseq method from the response
@@ -5484,7 +5520,7 @@ bool call::process_incoming(const char* msg, const struct sockaddr_storage* src)
     /* store the route set only once. TODO: does not support target refreshes!! */
     if (call_scenario->messages[search_index]->bShouldRecordRoutes &&
             dialog_route_set == nullptr) {
-        realloc_ptr = (char*)realloc(next_req_url, MAX_HEADER_LEN);
+        realloc_ptr = static_cast<char*>(realloc(next_req_url, MAX_HEADER_LEN));
         if (realloc_ptr) {
             next_req_url = realloc_ptr;
             /* Ensure next_req_url has an empty value in case contact is missing */
