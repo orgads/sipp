@@ -64,6 +64,8 @@ public:
         E_AT_VAR_TO_DOUBLE,
         E_AT_VAR_STRCMP,
         E_AT_VAR_TRIM,
+        E_AT_VAR_URLDECODE,
+        E_AT_VAR_URLENCODE,
         E_AT_VERIFY_AUTH,
         E_AT_SET_DEST,
         E_AT_CLOSE_CON,
@@ -77,6 +79,18 @@ public:
         E_AT_RTP_STREAM_RESUME,
         E_AT_RTP_STREAM_PLAY,
         E_AT_RTP_ECHO,
+        E_AT_RTP_STREAM_PAUSEAPATTERN,
+        E_AT_RTP_STREAM_RESUMEAPATTERN,
+        E_AT_RTP_STREAM_PLAYAPATTERN,
+        E_AT_RTP_STREAM_PAUSEVPATTERN,
+        E_AT_RTP_STREAM_RESUMEVPATTERN,
+        E_AT_RTP_STREAM_PLAYVPATTERN,
+        E_AT_RTP_STREAM_RTPECHO_UPDATEAUDIO,
+        E_AT_RTP_STREAM_RTPECHO_STARTAUDIO,
+        E_AT_RTP_STREAM_RTPECHO_STOPAUDIO,
+        E_AT_RTP_STREAM_RTPECHO_UPDATEVIDEO,
+        E_AT_RTP_STREAM_RTPECHO_STARTVIDEO,
+        E_AT_RTP_STREAM_RTPECHO_STOPVIDEO,
         E_AT_NB_ACTION
     };
 
@@ -131,7 +145,8 @@ public:
 #ifdef PCAPPLAY
     pcap_pkts     *getPcapPkts(); /* send_packets specific function */
 #endif
-    rtpstream_actinfo_t *getRTPStreamActInfo(); /* return stored rtp stream playback params */
+    rtpecho_actinfo_t* getRTPEchoActInfo();  /* returns stored rtp echo params */
+    rtpstream_actinfo_t* getRTPStreamActInfo(); /* return stored rtp stream playback params */
 
     void setActionType   (T_ActionType   P_value);
     void setLookingPlace (T_LookingPlace P_value);
@@ -158,7 +173,9 @@ public:
     void setPcapArgs(const char* P_value);          /* send_packets specific function */
     void setPcapArgs     (pcap_pkts   *  P_value);  /* send_packets specific function */
 #endif
-    void setRTPStreamActInfo(const char* P_value);  /* parse rtp stream playback values from string */
+    void setRTPEchoActInfo(const char* P_value);  /* parses rtp echo params from string */
+    void setRTPEchoActInfo(rtpecho_actinfo_t* P_value);  /* copy stored rtp echo params */
+    void setRTPStreamActInfo(const char *P_value);  /* parse rtp stream playback values from string */
     void setRTPStreamActInfo(rtpstream_actinfo_t* P_value); /* copy stored rtp stream playback params */
 
     void setSubVarId     (int P_value);
@@ -211,6 +228,7 @@ private:
     /* pcap specific member */
     pcap_pkts *    M_pcapArgs;
 #endif
+    rtpecho_actinfo_t M_rtpecho_actinfo;
     rtpstream_actinfo_t M_rtpstream_actinfo;
     void setSubString(char** P_target, const char* P_source, int P_start, int P_stop);
 };

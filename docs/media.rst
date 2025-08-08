@@ -9,9 +9,9 @@ RTP echo
 ````````
 
 The "RTP echo" feature allows SIPp to listen to one or two local IP
-address and port (specified using -mi and -mp command line parameters)
-for RTP media. Everything that is received on this address/port is
-echoed back to the sender.
+address and port (specified using -mi and -min_rtp_port command line
+parameters) for RTP media. Everything that is received on this
+address/port is echoed back to the sender.
 
 RTP/UDP packets coming on this port + 2 are also echoed to their
 sender (used for sound and video echo).
@@ -25,6 +25,15 @@ RTP.
 
 More details on how to do this can be found in the action reference
 section.
+
+
+RTP check functionality
+```````````````````````
+
+SIPp has support for bidirectional RTP or bidirectional SRTP
+checking. This is not detailed in the RST docs, but in a separate PDF,
+unfortunately. See:
+:download:`rtpcheck_xml_syntax_reference.pdf <rtpcheck_xml_syntax_reference.pdf>`
 
 
 PCAP Play

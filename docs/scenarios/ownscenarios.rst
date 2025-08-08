@@ -171,9 +171,9 @@ List of attributes common to all commands
 
       - ::
 
-          <nop condexec="skipthis"condexec_inverse="true">
+          <nop condexec="skipthis" condexec_inverse="true">
 
-    * - counter
+    * - ``counter``
       - Increments the counter given as
         parameter when the message is sent. The counters are saved in the
         statistic file.
@@ -183,7 +183,20 @@ List of attributes common to all commands
           <send counter="MsgA">
 
         Increments counter "MsgA" when the message is sent.
-        Each command also has its own unique attributes, listed here:
+
+    * - ``hide``
+      - Hides command on message display.  Especially useful for <nop>
+        
+      - ::
+
+          <nop hide="true">
+
+    * - ``display``
+      - Sets display text to supplied string.  Especially useful for <nop>
+
+      - ::
+
+          <nop display="Extract Contact">
 
 
 List of commands with their attributes
@@ -536,12 +549,12 @@ List of commands with their attributes
 
         call length values are distributed between 0 and 10ms, 10 and
         20ms, 20 and 30ms, 30 and beyond.
-    * - **<Globals>**
+    * - **<Global>**
       - ``variables``
       - Specify the name of globally scoped variables.
       - ::
 
-          <Globals variables="foo,bar"/>
+          <Global variables="foo,bar"/>
 
     * - **<User>**
       - ``variables``
@@ -559,7 +572,7 @@ List of commands with their attributes
 
 
 There are not so many commands: send, recv, sendCmd, recvCmd, pause,
-ResponseTimeRepartition, CallLengthRepartition, Globals, User, and
+ResponseTimeRepartition, CallLengthRepartition, Global, User, and
 Reference. To make things even clearer, nothing is better than an
 example...
 

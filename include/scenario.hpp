@@ -25,6 +25,8 @@
 #define __SCENARIO__
 
 #include <map>
+#include <unordered_map>
+
 #include <sys/socket.h>
 #include "actions.hpp"
 #include "variables.hpp"
@@ -42,6 +44,7 @@
 
 #define MODE_CLIENT        0
 #define MODE_SERVER        1
+#define MODE_MIXED         2
 
 #define MODE_3PCC_NONE                0
 #define MODE_3PCC_CONTROLLER_A  2
@@ -91,7 +94,7 @@ public:
     char         * peer_src;
 
     /* If this is a recv */
-    int            recv_response;
+    char         * recv_response;
     char         * recv_request;
     int            optional;
     bool           advance_state;
@@ -188,6 +191,13 @@ public:
     int get_counter(const char *varName, const char *what);
     int get_rtd(const char *ptr, bool start);
     int find_var(const char *varName);
+    void setFileName(const char *fileName);
+    const std::string &getFileName() const { return fileName; }
+    const std::string &getPath() const { return path; }
+
+    void addRtpTaskThreadID(pthread_t id);
+    void removeRtpTaskThreadID(pthread_t id);
+    std::unordered_map<pthread_t, std::string>& fetchRtpTaskThreadIDs();
 
     CStat *stats;
     AllocVariableTable *allocVars;
@@ -199,6 +209,8 @@ private:
     str_int_map initLabelMap;
 
     str_int_map txnMap;
+    std::string fileName;
+    std::string path;
 
     bool found_timewait;
 
@@ -220,10 +232,13 @@ private:
 
     bool hidedefault;
     bool last_recv_optional;
+
+    std::unordered_map<pthread_t, std::string> threadIDs;
 };
 
 /* There are external variable containing the current scenario */
 extern scenario      *main_scenario;
+extern scenario      *rx_scenario;
 extern scenario      *ooc_scenario;
 extern scenario      *aa_scenario;
 extern scenario      *display_scenario;
@@ -241,12 +256,6 @@ void parse_slave_cfg();
 
 void getActionForThisMessage();
 CSample *parse_distribution(bool oldstyle);
-int  createIntegerTable(char          * P_listeStr,
-                        unsigned int ** listeInteger,
-                        int           * sizeOfList);
-
-int  isWellFormed(char * P_listeStr,
-                  int  * nombre);
 
 /* String table functions. */
 int createStringTable(const char* inputString, char*** stringList, int* sizeOfList);

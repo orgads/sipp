@@ -39,7 +39,7 @@
 #include <time.h>
 #include <sys/time.h>
 #include <unistd.h>
-#ifdef __MACH__
+#if defined(__MACH__) && defined(__APPLE__)
 #include <mach/clock.h>
 #include <mach/mach.h>
 #endif
@@ -57,7 +57,7 @@ unsigned long long getmicroseconds()
     unsigned long long microseconds;
     static unsigned long long start_time = 0;
 
-#ifdef __MACH__
+#if defined(__MACH__) && defined(__APPLE__)
     // OS X does not have clock_gettime, use clock_get_time
     clock_serv_t cclock;
     mach_timespec_t mts;
@@ -79,10 +79,11 @@ unsigned long long getmicroseconds()
     }
     microseconds = microseconds - start_time;
 
-    // Static global from sipp.hpp
-    clock_tick = microseconds / MICROSECONDS_PER_MILLISECOND;
-
     return microseconds;
+}
+
+void update_clock_tick() {
+    clock_tick = getmilliseconds();
 }
 
 // Returns the number of milliseconds that have passed since SIPp

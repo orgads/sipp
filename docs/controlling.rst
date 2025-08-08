@@ -41,7 +41,6 @@ List of Interactive Commands
 - ``set users X`` Sets the number of users (only valid when -users is specified). set rate 10
 - ``set limit X`` Sets the open call limit (equivalent to -l option) set limit 100
 - ``set hide <true|false>`` Should the hide XML attribute be respected? set hide false
-- ``set index <true|false>`` Display message indexes in the scenario screen. set index true
 - ``set display <main|ooc>`` Changes the scenario that is displayed to either the main or the out-of-call scenario. set display main set display ooc
 - ``trace <log> <on|off>`` Turns log on or off at run time. Valid values for log are "error", "logs", "messages", and "shortmessages". trace error on
 
@@ -94,7 +93,7 @@ You can resume the traffic by pressing 'p' again.
 To quit SIPp, press the 'q' key. SIPp will stop placing new calls and
 wait until all current calls go to their end. SIPp will then exit.
 
-You can also force SIPp to quit immediatly by pressing the 'Q' key.
+You can also force SIPp to quit immediately by pressing the 'Q' key.
 Current calls will be terminated by sending a BYE or CANCEL message
 (depending if the calls have been established or not). The same
 behaviour is obtained by pressing 'q' twice.
@@ -134,7 +133,7 @@ It is then possible to control SIPp like this:
   All keys available through keyboard are also available in the remote
   control interface
 
-You could also have a small shell script to automate a serie of
+You could also have a small shell script to automate a series of
 action. For example, this script will increase the call rate by 10
 more new calls/s every 5 seconds, wait at this call rate for one
 minute and exit SIPp:

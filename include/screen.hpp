@@ -43,8 +43,6 @@ void print_statistics(int last);
 extern int key_backspace;
 extern int key_dc;
 
-typedef std::vector<std::string> string_array;
-
 class ScreenPrinter {
 public:
     ScreenPrinter():
@@ -66,7 +64,7 @@ private:
     void draw_repartition_detailed(CStat::T_dynamicalRepartition * tabRepartition,
                                  int sizeOfTab);
 
-    string_array lines;
+    std::vector<std::string> lines;
 
     bool M_last;
 };

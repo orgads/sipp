@@ -25,7 +25,7 @@
 
 <!ELEMENT recv ( action? ) >
 <!ATTLIST recv %messageCmdCommon; >
-<!ATTLIST recv response NMTOKEN #IMPLIED >
+<!ATTLIST recv response CDATA #IMPLIED >
 <!ATTLIST recv request CDATA #IMPLIED >
 <!ATTLIST recv optional (true|false) #IMPLIED >
 <!ATTLIST recv ignosesdp (true|false) #IMPLIED >
@@ -67,7 +67,7 @@
 <!ELEMENT CallLengthRepartition EMPTY >
 <!ATTLIST CallLengthRepartition value CDATA #REQUIRED >
 
-<!ELEMENT action ( add | assign | assignstr | closecon | divide | ereg | error | exec | gettimeofday | index | insert | jump | log | lookup | multiply | pauserestore | replace | rtp_echo | sample | setdest | strcmp | subtract | test | todouble | trim | verifyauth | warning )+ >
+<!ELEMENT action ( add | assign | assignstr | closecon | divide | ereg | error | exec | gettimeofday | index | insert | jump | log | lookup | multiply | pauserestore | replace | rtp_echo | sample | setdest | strcmp | subtract | test | todouble | trim | urldecode | urlencode | verifyauth | warning )+ >
 
 <!-- BEGIN actions -->
 
@@ -92,6 +92,7 @@
 <!ATTLIST exec play_pcap CDATA #IMPLIED >
 <!ATTLIST exec play_pcap_audio CDATA #IMPLIED >
 <!ATTLIST exec rtp_stream CDATA #IMPLIED >
+<!ATTLIST exec rtp_echo CDATA #IMPLIED >
 
 <!ELEMENT rtp_echo EMPTY >
 <!ATTLIST rtp_echo value CDATA #REQUIRED >
@@ -106,6 +107,16 @@
 <!ATTLIST test compare CDATA #REQUIRED >
 <!ATTLIST test value CDATA #REQUIRED >
 <!ATTLIST test variable CDATA #REQUIRED >
+
+<!ELEMENT assign EMPTY >
+<!ATTLIST assign assign_to CDATA #REQUIRED >
+<!ATTLIST assign variable CDATA #REQUIRED >
+
+<!ELEMENT urldecode EMPTY >
+<!ATTLIST urldecode variable CDATA #REQUIRED >
+
+<!ELEMENT urlencode EMPTY >
+<!ATTLIST urlencode variable CDATA #REQUIRED >
 
 <!-- END actions -->
 

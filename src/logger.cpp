@@ -54,7 +54,7 @@ void log_off(struct logfile_info *lfi)
         pthread_mutex_lock(lfi->lockfile);
         fflush(lfi->fptr);
         fclose(lfi->fptr);
-        lfi->fptr = NULL;
+        lfi->fptr = nullptr;
         lfi->overwrite = false;
         pthread_mutex_unlock(lfi->lockfile);
     }
@@ -78,7 +78,7 @@ void print_count_file(FILE* f, int header)
         main_scenario->stats->getStartTime(&startTime);
         unsigned long globalElapsedTime =
             CStat::computeDiffTimeInMs(&currentTime, &startTime);
-        fprintf(f, "%s%s", CStat::formatTime(&currentTime), stat_delimiter);
+        fprintf(f, "%s%s", CStat::formatTime(&currentTime, rfc3339), stat_delimiter);
         fprintf(f, "%s%s", CStat::msToHHMMSSus(globalElapsedTime),
                 stat_delimiter);
     }
@@ -118,7 +118,7 @@ void print_count_file(FILE* f, int header)
             }
         } else if (curmsg->recv_response) {
             if (header) {
-                sprintf(temp_str, "%u_%d_", index, curmsg->recv_response);
+                sprintf(temp_str, "%u_%s_", index, curmsg->recv_response);
 
                 fprintf(f, "%sRecv%s", temp_str, stat_delimiter);
                 fprintf(f, "%sRetrans%s", temp_str, stat_delimiter);
@@ -204,7 +204,7 @@ void print_error_codes_file(FILE* f)
     main_scenario->stats->getStartTime(&startTime);
     unsigned long globalElapsedTime =
         CStat::computeDiffTimeInMs(&currentTime, &startTime);
-    fprintf(f, "%s%s", CStat::formatTime(&currentTime), stat_delimiter);
+    fprintf(f, "%s%s", CStat::formatTime(&currentTime, rfc3339), stat_delimiter);
     fprintf(f, "%s%s", CStat::msToHHMMSSus(globalElapsedTime), stat_delimiter);
 
     // Print comma-separated list of all error codes seen since the last time
@@ -304,7 +304,7 @@ static void rotatef(struct logfile_info* lfi)
             lfi->nfiles++;
             fflush(lfi->fptr);
             fclose(lfi->fptr);
-            lfi->fptr = NULL;
+            lfi->fptr = nullptr;
             rename(lfi->file_name, L_rotate_file_name);
         }
     }
@@ -386,7 +386,7 @@ static int _trace(struct logfile_info* lfi, const char* fmt, va_list ap)
 
         if (max_log_size && lfi->count > max_log_size) {
             fclose(lfi->fptr);
-            lfi->fptr = NULL;
+            lfi->fptr = nullptr;
         }
 
         if (ringbuffer_size && lfi->count > ringbuffer_size) {
@@ -485,7 +485,7 @@ static void _screen_error(int fatal, bool use_errno, int error, const char *fmt,
     const std::size_t bufSize = sizeof(screen_last_error) / sizeof(screen_last_error[0]);
     const char* const bufEnd = &screen_last_error[bufSize];
     char* c = screen_last_error;
-    _advance(c, snprintf(c, bufEnd - c, "%s: ", CStat::formatTime(&currentTime)));
+    _advance(c, snprintf(c, bufEnd - c, "%s: ", CStat::formatTime(&currentTime, rfc3339)));
     if (c < bufEnd) {
         _advance(c, vsnprintf(c, bufEnd - c, fmt, ap));
     }
@@ -504,12 +504,12 @@ static void _screen_error(int fatal, bool use_errno, int error, const char *fmt,
                 _advance(c, snprintf(c, bufEnd - c, "Unable to create '%s': %s.\n",
                                      screen_logfile, strerror(errno)));
             }
-            sipp_exit(EXIT_FATAL_ERROR);
+            sipp_exit(EXIT_FATAL_ERROR, 0, 0);
         }
     }
 
     if (error_lfi.fptr) {
-        count += fprintf(error_lfi.fptr, "%s", screen_last_error);
+        count += fprintf(error_lfi.fptr, "%s\n", screen_last_error);
         fflush(error_lfi.fptr);
         if (ringbuffer_size && count > ringbuffer_size) {
             rotate_errorf();
@@ -520,7 +520,7 @@ static void _screen_error(int fatal, bool use_errno, int error, const char *fmt,
             if (error_lfi.fptr) {
                 fflush(error_lfi.fptr);
                 fclose(error_lfi.fptr);
-                error_lfi.fptr = NULL;
+                error_lfi.fptr = nullptr;
                 error_lfi.overwrite = false;
             }
         }
@@ -531,9 +531,9 @@ static void _screen_error(int fatal, bool use_errno, int error, const char *fmt,
 
     if (fatal) {
         if (error == EADDRINUSE) {
-            sipp_exit(EXIT_BIND_ERROR);
+            sipp_exit(EXIT_BIND_ERROR, 0, 0);
         } else {
-            sipp_exit(EXIT_FATAL_ERROR);
+            sipp_exit(EXIT_FATAL_ERROR, 0, 0);
         }
     }
 }
@@ -545,7 +545,7 @@ extern "C" {
         va_start(ap, fmt);
         _screen_error(true, false, 0, fmt, ap);
         va_end(ap);
-        assert(0);
+        exit(1);
     }
 
     void ERROR_NO(const char *fmt, ...)
@@ -554,7 +554,7 @@ extern "C" {
         va_start(ap, fmt);
         _screen_error(true, true, errno, fmt, ap);
         va_end(ap);
-        assert(0);
+        exit(1);
     }
 
     void WARNING(const char *fmt, ...)

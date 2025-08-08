@@ -63,7 +63,7 @@ Installing SIPp
 
     + C++ Compiler
     + curses or ncurses library
-    + For TLS support: OpenSSL >= 0.9.8
+    + For TLS support: OpenSSL >= 1.1.0 or WolfSSL >= 3.15.0
     + For pcap play support: libpcap and libnet
     + For SCTP support: lksctp-tools
     + For distributed pauses: `Gnu Scientific Libraries`_
@@ -79,10 +79,10 @@ Installing SIPp
         cmake .
         make
 
-    + With TLS support, you must have installed `OpenSSL library`_
-      (>=0.9.8) (which may come with your system). Building SIPp
-      consists only of adding the ``-DUSE_SSL=1`` option to the
-      cmake command::
+    + With TLS and SHA-256 support, you must have installed `OpenSSL library`_
+      (>=1.1.0) (which may come with your system) or `WolfSSL library`_
+      (>=3.15.0). Building SIPp consists only of adding the
+      ``-DUSE_SSL=1`` option to the cmake command::
 
         tar -xvzf sipp-xxx.tar.gz
         cd sipp
@@ -128,7 +128,7 @@ Installing SIPp
 
     + Copy the `WinPcap developer package`_ to "C:\cygwin\lib\WpdPack"
     + Remove or rename "pthread.h" in "C:\cygwin\lib\WpdPack\Include", as
-      it interfers with pthread.h from cygwin
+      it interferes with pthread.h from cygwin
     + Compile according to the instructions above.
 
 .. _GNU GPL license: https://www.gnu.org/copyleft/gpl.html
@@ -137,3 +137,4 @@ Installing SIPp
 .. _hewlett-packard: https://www.hp.com/
 .. _SIPp's master tree: https://github.com/SIPp/sipp/tree/master
 .. _OpenSSL library: https://www.openssl.org/
+.. _WolfSSL library: https://www.wolfssl.com/

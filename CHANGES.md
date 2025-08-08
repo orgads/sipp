@@ -1,5 +1,102 @@
-Bugs fixed in 3.6.2~rc1
+BREAKING(!) changes in 3.7.3
+============================
+
+- Remove support for variables in PCAP filenames, originally introduced in 3.7.0. See #673
+    
+Bugs fixed in 3.7.3
+===================
+
+- Recovered `-mp` and `[auto_media_port]` to maintain backwards compatibility (by Orgad Shaneh)
+- Fix crash when using PCAP play with more than one call (by Pete O'Neill)
+- Fix pager on macOS by trying less and more too (by Walter Doekes)
+
+Bugs fixed in 3.7.2
+===================
+
+- Remove excessive log
+
+Bugs fixed in 3.7.1
 =======================
+
+- Correctly open the control socket
+- The SIPp binary can now be built even when the `gtest` checkout is missing
+- rtpstream files are now also found next to the scenario. If it is not found there, it will be treated as a relative path as usual.
+
+Features added in 3.7.0
+===========================
+
+- RTPstream can now handle .wav files with a WAV header (by Orgad Shaneh)
+
+Bugs fixed in 3.7.0
+=======================
+- RTPCHECK stability fixes (by Jeannot Langlois)
+- Support CRLF-format injection files (by Orgad Shaneh)
+- Fix to [next_url] when a display name is present in the contact (by enneig)
+- Add 'transport' to the Contact header for UAC scenarios (by Martin Flaska)
+- Update built-in scenarios to Copy Record-Route from INVITE to 200OK to comply with RFC 3261 (by kadabusha)
+- Fix for local_port keyword using TCP or TLS (by Felippe Silvestre)
+- Correct handling of IMS-AKA RES values containing null bytes (by Sergey Zyrianov)
+- Fix potential overwrite of auth value when calculating auth (by ZhaohuiLiu)
+- Diagnostics improvements:
+  - Print, rather than lose, any buffered response time data on exit (by Orgad Shaneh)
+  - Add the IPs and remote address family to 'Network family mismatch' log  (by Rob Day)
+  - Print OpenSSL error reason when certificate load fails (by Rajesh Singh)
+  - Give clear error if multiple command-line parameters are being interpreted as remote_host
+- Prevent clock_tick moving backwards (and getting behind wheel_base and causing an assert) (by Rob Day)
+- Ensure that sockets are marked as non-blocking before OpenSSL calls are made (by Rob Day)
+- Prevent RTPStream crash due to a thread ID of 0 (by Rob Day)
+- Cygwin, FreeBSD and Hurd build fixes (by Orgad Shaneh, kadabusha and Zopolis4)
+- Static build fixes (by  Aaron Meriwether)
+
+Features added in 3.7.0~rc1
+===========================
+
+* B2BUA Media Gateway RTP/SRTP bit pattern testing -- see
+  `docs/rtpcheck_xml_syntax_reference.pdf`. Command line examples:
+    ```
+    # UAS (RTP)
+    ./sipp -m 1 -sf sipp_scenarios/pfca_uas.xml \
+      -i 127.0.0.3 -t u1 -p 5060 -rtp_echo
+
+    # UAC (RTP)
+    ./sipp -m 1 -sf sipp_scenarios/pfca_uac_apattern.xml \
+      -t u1 -i 127.0.0.2 -p 5060 127.0.0.3:5060
+    ```
+    ```
+    # UAS (audio SRTP)
+    ./sipp -m 1 -sf sipp_scenarios/pfca_uas_audio_crypto_simple.xml \
+      -t u1 -i 127.0.0.3 -p 5060 -srtpcheck_debug
+
+    # UAC (audio SRTP)
+    ./sipp -m 1 -sf sipp_scenarios/pfca_uac_apattern_crypto_simple.xml \
+      -t u1 -i 127.0.0.2 -p 5060 -rtpcheck_debug -srtpcheck_debug \
+      127.0.0.3:5060
+    ```
+  By Jeannot Langlois.
+* Removed `-mp` in favor of `-min_rtp_port` and `-max_rtp_port`. Also
+  removed `[auto_media_port]`. There are way too many (conflicting)
+  options to specify ports here.
+* URL encode/decode `<action>` for scenarios (by Jérôme Poulin).
+* Variables in the rtpstream/pcap filenames (by Orgad Shaneh).
+* WolfSSL/WolfCrypt library support (as alternative to OpenSSL, by
+  Thomas Uhle).
+
+
+Bugs fixed in 3.7.0~rc1
+=======================
+
+* Documentation updates. Code cleanups. Build fixes. (By Walter Doekes,
+  Thomas Uhle, ChanderG, Lin Sun, Markus Goetzl, Rob Day, Stefan
+  Mititelu, Orgad Shaneh, Karn Saheb).
+* Fix socket/tcp refcount/order issue (by Orgad Shaneh).
+* Fix timezone in [date] on FreeBSD (by kadabusha).
+* Track auto-answered messages as a visible counter rather than an error
+  log (by Rob Day).
+* Unconditionally show index in scenario screen (by Rob Day).
+
+
+Bugs fixed in 3.6.2
+===================
 
 * Fix crash when abusing authentication method (#503, by Markus).
 * Fix crash when trying to change an unset ooc scenario (#463, by
@@ -52,7 +149,7 @@ BREAKING(!) changes in 3.6.0
 * Automatic filenames (trace files, error files, etc..) are now created in
   the current working directory instead of in the directory of the scenario
   file. (Issue #399, reported by @sergey-safarov.)
-* Only validates SSL certficate if CA-file is separately specified!
+* Only validates SSL certificate if CA-file is separately specified!
   (PR #335, by Patrick Wildt @bluerise.)
 * Angle brackets `<` and `>` need to be escaped inside XML attributes.
   See #414. So, not `regexp="<(sip:.*)>"` but `regexp="&lt;(sip:.*)&gt;"`.

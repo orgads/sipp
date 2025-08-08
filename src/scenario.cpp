@@ -42,23 +42,23 @@ message::message(int index, const char *desc)
 {
     this->index = index;
     this->desc = desc;
-    pause_distribution = NULL; // delete on exit
+    pause_distribution = nullptr; // delete on exit
     pause_variable = -1;
-    pause_desc = NULL; // free on exit
+    pause_desc = nullptr; // free on exit
     sessions = 0;
     bShouldRecordRoutes = 0;
     bShouldAuthenticate = 0;
 
-    send_scheme = NULL; // delete on exit
+    send_scheme = nullptr; // delete on exit
     retrans_delay = 0;
     timeout = 0;
 
-    recv_response = 0;
-    recv_request = NULL; // free on exit
+    recv_response = nullptr; // free on exit
+    recv_request = nullptr; // free on exit
     optional = 0;
     advance_state = true;
     regexp_match = 0;
-    regexp_compile = NULL; // regfree (if not NULL) and free on exit
+    regexp_compile = nullptr; // regfree (if not nullptr) and free on exit
 
     /* Anyway */
     start_rtd = 0;
@@ -68,20 +68,20 @@ message::message(int index, const char *desc)
     crlf = 0;
     ignoresdp = false;
     hide = 0;
-    display_str = NULL; // free on exit
+    display_str = nullptr; // free on exit
     test = -1;
     condexec = -1;
     condexec_inverse = false;
     chance = 0;/* meaning always */
     next = -1;
-    nextLabel = NULL; // free on exit
+    nextLabel = nullptr; // free on exit
     on_timeout = -1;
-    onTimeoutLabel = NULL; // free on exit
+    onTimeoutLabel = nullptr; // free on exit
     timewait = false;
 
     /* 3pcc extended mode */
-    peer_dest = NULL; // free on exit
-    peer_src = NULL; // free on exit
+    peer_dest = nullptr; // free on exit
+    peer_src = nullptr; // free on exit
 
     /* Statistics */
     nb_sent = 0;
@@ -93,11 +93,11 @@ message::message(int index, const char *desc)
     nb_lost = 0;
     counter = 0;
 
-    M_actions = NULL; // delete on exit
+    M_actions = nullptr; // delete on exit
 
     M_type = 0;
 
-    M_sendCmdData = NULL; // delete on exit
+    M_sendCmdData = nullptr; // delete on exit
     M_nbCmdSent = 0;
     M_nbCmdRecv = 0;
 
@@ -107,19 +107,20 @@ message::message(int index, const char *desc)
     start_txn = 0;
     response_txn = 0;
     ack_txn = 0;
-    recv_response_for_cseq_method_list = NULL; // free on exit
+    recv_response_for_cseq_method_list = nullptr; // free on exit
 }
 
 message::~message()
 {
-    delete(pause_distribution);
+    delete pause_distribution;
     free(pause_desc);
-    delete(send_scheme);
+    delete send_scheme;
     free(recv_request);
-    if (regexp_compile != NULL) {
+    free(recv_response);
+    if (regexp_compile != nullptr) {
         regfree(regexp_compile);
     }
-    free(regexp_compile);
+    delete regexp_compile;
 
     free(display_str);
     free(nextLabel);
@@ -128,13 +129,14 @@ message::~message()
     free(peer_dest);
     free(peer_src);
 
-    delete(M_actions);
-    delete(M_sendCmdData);
+    delete M_actions;
+    delete M_sendCmdData;
     free(recv_response_for_cseq_method_list);
 }
 
 /******** Global variables which compose the scenario file **********/
 
+scenario      *rx_scenario;
 scenario      *main_scenario;
 scenario      *ooc_scenario;
 scenario      *aa_scenario;
@@ -147,6 +149,8 @@ int creationMode = MODE_CLIENT;
 int sendMode = MODE_CLIENT;
 /* This describes what our 3PCC behavior is. */
 int thirdPartyMode = MODE_3PCC_NONE;
+
+#define KEYWORD_SIZE 256
 
 /*************** Helper functions for various types *****************/
 long get_long(const char *ptr, const char *what)
@@ -234,29 +238,29 @@ double get_double(const char *ptr, const char *what)
     return ret;
 }
 
+#ifdef PCAPPLAY
 /* If the value is enclosed in [brackets], it is assumed to be
  * a command-line supplied keyword value (-key). */
 static char* xp_get_keyword_value(const char *name)
 {
     const char* ptr = xp_get_value(name);
     size_t len;
+    char keyword[KEYWORD_SIZE + 1];
 
     if (ptr && ptr[0] == '[' && (len = strlen(ptr)) && ptr[len - 1] == ']') {
-        int i = 0;
-        len -= 2; /* without the brackets */
-        while (generic[i]) {
-            const char* keyword = *generic[i];
-            if (strncmp(ptr + 1, keyword, len) == 0 && strlen(keyword) == len) {
-                const char* value = *(generic[i] + 1);
-                return strdup(value);
-            }
-            ++i;
+        memcpy(keyword, ptr + 1, len - 2);
+
+        auto gen = generic.find(keyword);
+        if (gen != generic.end()) {
+            return strdup((*gen).second.c_str());
         }
+
         ERROR("%s \"%s\" looks like a keyword value, but keyword not supplied!", name, ptr);
     }
 
-    return ptr ? strdup(ptr) : NULL;
+    return ptr ? strdup(ptr) : nullptr;
 }
+#endif
 
 static char* xp_get_string(const char *name, const char *what)
 {
@@ -400,6 +404,40 @@ int scenario::get_txn(const char *txnName, const char *what, bool start, bool is
 int scenario::find_var(const char *varName)
 {
     return allocVars->find(varName, false);
+}
+
+void scenario::addRtpTaskThreadID(pthread_t id)
+{
+    threadIDs[id] = "threadID";
+}
+
+void scenario::setFileName(const char *name)
+{
+    const char* sep = strrchr(name, '/');
+    if (sep) {
+        ++sep; // include slash
+        path = std::string(name, sep - name);
+    } else {
+        path.clear();
+        sep = name;
+    }
+    const char* ext = strrchr(sep, '.');
+    if (ext && strcmp(ext, ".xml") == 0) {
+        fileName = std::string(sep, ext - sep);
+    } else {
+        fileName = sep;
+    }
+    stats->setFileName(fileName.c_str(), ".csv");
+}
+
+void scenario::removeRtpTaskThreadID(pthread_t id)
+{
+    threadIDs.erase(id);
+}
+
+std::unordered_map<pthread_t, std::string>& scenario::fetchRtpTaskThreadIDs()
+{
+    return threadIDs;
 }
 
 int scenario::get_var(const char *varName, const char *what)
@@ -595,7 +633,7 @@ int get_cr_number(const char *src)
     return res;
 }
 
-static char* clean_cdata(char *ptr, int *removed_crlf = NULL)
+static char* clean_cdata(char *ptr, int *removed_crlf = nullptr)
 {
     char * msg;
 
@@ -658,7 +696,7 @@ void scenario::checkOptionalRecv(char *elem, unsigned int scenario_file_cursor)
 scenario::scenario(char * filename, int deflt)
 {
     char * elem;
-    char *method_list = NULL;
+    char *method_list = nullptr;
     unsigned int scenario_file_cursor = 0;
     int    L_content_length = 0 ;
     char * peer;
@@ -679,6 +717,9 @@ scenario::scenario(char * filename, int deflt)
     stats = new CStat();
     allocVars = new AllocVariableTable(userVariables);
 
+    if(filename) {
+        setFileName(filename);
+    }
     hidedefault = false;
 
     elem = xp_open_element(0);
@@ -715,7 +756,7 @@ scenario::scenario(char * filename, int deflt)
         } else if(!strcmp(elem, "Global")) {
             ptr = xp_get_string("variables", "Global");
 
-            char **       currentTabVarName = NULL;
+            char **       currentTabVarName = nullptr;
             int           currentNbVarNames;
 
             createStringTable(ptr, &currentTabVarName, &currentNbVarNames);
@@ -727,7 +768,7 @@ scenario::scenario(char * filename, int deflt)
         } else if(!strcmp(elem, "User")) {
             ptr = xp_get_string("variables", "User");
 
-            char **       currentTabVarName = NULL;
+            char **       currentTabVarName = nullptr;
             int           currentNbVarNames;
 
             createStringTable(ptr, &currentTabVarName, &currentNbVarNames);
@@ -739,14 +780,14 @@ scenario::scenario(char * filename, int deflt)
         } else if(!strcmp(elem, "Reference")) {
             ptr = xp_get_string("variables", "Reference");
 
-            char **       currentTabVarName = NULL;
+            char **       currentTabVarName = nullptr;
             int           currentNbVarNames;
 
             createStringTable(ptr, &currentTabVarName, &currentNbVarNames);
             for (int i = 0; i < currentNbVarNames; i++) {
                 int id = allocVars->find(currentTabVarName[i], false);
                 if (id == -1) {
-                    ERROR("Could not reference non-existant variable '%s'", currentTabVarName[i]);
+                    ERROR("Could not reference non-existent variable '%s'", currentTabVarName[i]);
                 }
             }
             freeStringTable(currentTabVarName, currentNbVarNames);
@@ -874,7 +915,7 @@ scenario::scenario(char * filename, int deflt)
                 curmsg->M_type = MSG_TYPE_RECV;
                 /* Received messages descriptions */
                 if((cptr = xp_get_value("response"))) {
-                    curmsg ->recv_response = get_long(cptr, "response code");
+                    curmsg ->recv_response = strdup(cptr);
                     if (method_list) {
                         curmsg->recv_response_for_cseq_method_list = strdup(method_list);
                     }
@@ -1010,7 +1051,8 @@ scenario::scenario(char * filename, int deflt)
     xp_close_element();
     /* 3/23/2022 - NVF Commented when trying to use the old xml_parser.c so our current SIPP scripts work!
       if (xp_is_invalid()) {
-        ERROR("Invalid XML in scenario");
+        ERROR("Invalid XML in scenario near line %d. See: https://github.com/SIPp/sipp/issues/414",
+                xp_get_invalid_line());
     }
     */
 
@@ -1045,7 +1087,7 @@ void scenario::runInit()
 {
     call *initcall;
     if (initmessages.size() > 0) {
-        initcall = new call(main_scenario, NULL, NULL, "///main-init", 0, false, false, true);
+        initcall = new call(main_scenario, nullptr, nullptr, "///main-init", 0, false, false, true);
         initcall->run();
     }
 }
@@ -1096,7 +1138,7 @@ scenario::~scenario()
 
 CSample *parse_distribution(bool oldstyle = false)
 {
-    CSample *distribution = NULL;
+    CSample *distribution = nullptr;
     const char *distname;
     const char *ptr = 0;
 
@@ -1167,7 +1209,7 @@ CSample *parse_distribution(bool oldstyle = false)
     } else if (!strcmp(distname, "negbin")) {
         double n = xp_get_double("n", "Negative Binomial distribution");
         double p = xp_get_double("p", "Negative Binomial distribution");
-        distribution = new CNegBin(n, p);
+        distribution = new CNegBin(p, n);
 #else
     } else if (!strcmp(distname, "normal")
                || !strcmp(distname, "lognormal")
@@ -1188,7 +1230,7 @@ CSample *parse_distribution(bool oldstyle = false)
 
 
 /* 3pcc extended mode:
- * get the correspondances between
+ * get the correspondences between
  * slave and master names and their
  * addresses */
 
@@ -1202,12 +1244,12 @@ void parse_slave_cfg()
 
     f = fopen(slave_cfg_file, "r");
     if(f) {
-        while (fgets(line, MAX_PEER_SIZE, f) != NULL) {
+        while (fgets(line, MAX_PEER_SIZE, f) != nullptr) {
             temp_peer = strtok(line, ";");
             if (!temp_peer)
                 continue;
 
-            temp_host = strtok(NULL, ";");
+            temp_host = strtok(nullptr, ";");
             if (!temp_host)
                 continue;
 
@@ -1231,7 +1273,9 @@ void scenario::computeSippMode()
     bool isRecvCmdFound = false;
     bool isSendCmdFound = false;
 
-    creationMode = -1;
+    if (creationMode != MODE_MIXED) {
+        creationMode = -1;
+    }
     sendMode = -1;
     thirdPartyMode = MODE_3PCC_NONE;
 
@@ -1351,7 +1395,7 @@ void scenario::parseAction(CActions *actions)
 {
     char *        actionElem;
     unsigned int recvScenarioLen = 0;
-    char **       currentTabVarName = NULL;
+    char **       currentTabVarName = nullptr;
     int           currentNbVarNames;
     int           sub_currentNbVarId;
     char* ptr;
@@ -1375,10 +1419,10 @@ void scenario::parseAction(CActions *actions)
 
                 if (strcmp(cptr, "msg") == 0) {
                     tmpAction->setLookingPlace(CAction::E_LP_MSG);
-                    tmpAction->setLookingChar (NULL);
+                    tmpAction->setLookingChar (nullptr);
                 } else if (strcmp(cptr, "body") == 0) {
                     tmpAction->setLookingPlace(CAction::E_LP_BODY);
-                    tmpAction->setLookingChar (NULL);
+                    tmpAction->setLookingChar (nullptr);
                 } else if (strcmp(cptr, "var") == 0) {
                     tmpAction->setVarInId(xp_get_var("variable", "ereg"));
                     tmpAction->setLookingPlace(CAction::E_LP_VAR);
@@ -1400,7 +1444,7 @@ void scenario::parseAction(CActions *actions)
                 }
             } else {
                 tmpAction->setLookingPlace(CAction::E_LP_MSG);
-                tmpAction->setLookingChar(NULL);
+                tmpAction->setLookingChar(nullptr);
             } // end if-else search_in
 
             if (xp_get_value("check_it")) {
@@ -1561,7 +1605,7 @@ void scenario::parseAction(CActions *actions)
             tmpAction->setActionType(CAction::E_AT_VERIFY_AUTH);
             free(username_ptr);
             free(password_ptr);
-            username_ptr = password_ptr = NULL;
+            username_ptr = password_ptr = nullptr;
         } else if(!strcmp(actionElem, "lookup")) {
             tmpAction->setVarId(xp_get_var("assign_to", "lookup"));
             tmpAction->setMessage(xp_get_string("file", "lookup"), 0);
@@ -1611,6 +1655,12 @@ void scenario::parseAction(CActions *actions)
         } else if(!strcmp(actionElem, "trim")) {
             tmpAction->setVarId(xp_get_var("assign_to", "trim"));
             tmpAction->setActionType(CAction::E_AT_VAR_TRIM);
+        } else if(!strcmp(actionElem, "urldecode")) {
+            tmpAction->setVarId(xp_get_var("variable", "urldecode"));
+            tmpAction->setActionType(CAction::E_AT_VAR_URLDECODE);
+        } else if(!strcmp(actionElem, "urlencode")) {
+            tmpAction->setVarId(xp_get_var("variable", "urlencode"));
+            tmpAction->setActionType(CAction::E_AT_VAR_URLENCODE);
         } else if(!strcmp(actionElem, "exec")) {
             if ((cptr = xp_get_value("command"))) {
                 tmpAction->setActionType(CAction::E_AT_EXECUTE_CMD);
@@ -1660,25 +1710,90 @@ void scenario::parseAction(CActions *actions)
             } else if (xp_get_value("play_dtmf")) {
                 ERROR("Scenario specifies a play_dtmf action, but this version of SIPp does not have PCAP support");
 #endif
-            } else if ((ptr = xp_get_keyword_value("rtp_stream"))) {
+            } else if ((cptr = xp_get_value("rtp_stream"))) {
+                ptr = strdup(cptr);
                 hasMedia = 1;
-                if (strcmp(ptr, "pause") == 0) {
+                if (!strcmp(ptr, "pauseapattern"))
+                {
+                    tmpAction->setActionType(CAction::E_AT_RTP_STREAM_PAUSEAPATTERN);
+                }
+                else if (!strcmp(ptr, "resumeapattern"))
+                {
+                    tmpAction->setActionType(CAction::E_AT_RTP_STREAM_RESUMEAPATTERN);
+                }
+                else if (!strncmp(ptr, "apattern", 8))
+                {
+                    tmpAction->setMessage(ptr);
+                    tmpAction->setActionType(CAction::E_AT_RTP_STREAM_PLAYAPATTERN);
+                }
+                else if (!strcmp(ptr, "pausevpattern"))
+                {
+                    tmpAction->setActionType(CAction::E_AT_RTP_STREAM_PAUSEVPATTERN);
+                }
+                else if (!strcmp(ptr, "resumevpattern"))
+                {
+                    tmpAction->setActionType(CAction::E_AT_RTP_STREAM_RESUMEVPATTERN);
+                }
+                else if (!strncmp(ptr, "vpattern", 8))
+                {
+                    tmpAction->setMessage(ptr);
+                    tmpAction->setActionType(CAction::E_AT_RTP_STREAM_PLAYVPATTERN);
+                }
+                else if (!strcmp(ptr, "pause"))
+                {
                     tmpAction->setActionType(CAction::E_AT_RTP_STREAM_PAUSE);
-                } else if (strcmp(ptr, "resume") == 0) {
+                }
+                else if (!strcmp(ptr, "resume"))
+                {
                     tmpAction->setActionType(CAction::E_AT_RTP_STREAM_RESUME);
-                } else {
-                    tmpAction->setRTPStreamActInfo(ptr);
+                }
+                else
+                {
+                    tmpAction->setMessage(ptr);
                     tmpAction->setActionType(CAction::E_AT_RTP_STREAM_PLAY);
                 }
                 free(ptr);
+            } else if ((cptr = xp_get_value("rtp_echo"))) {
+                ptr = strdup(cptr);
+                hasMedia = 1;
+                if (!strncmp(ptr, "startaudio", 10))
+                {
+                    tmpAction->setRTPEchoActInfo(ptr);
+                    tmpAction->setActionType(CAction::E_AT_RTP_STREAM_RTPECHO_STARTAUDIO);
+                }
+                else if (!strncmp(ptr, "updateaudio", 11))
+                {
+                    tmpAction->setRTPEchoActInfo(ptr);
+                    tmpAction->setActionType(CAction::E_AT_RTP_STREAM_RTPECHO_UPDATEAUDIO);
+                }
+                else if (!strncmp(ptr, "stopaudio", 9))
+                {
+                    tmpAction->setRTPEchoActInfo(ptr);
+                    tmpAction->setActionType(CAction::E_AT_RTP_STREAM_RTPECHO_STOPAUDIO);
+                }
+                else if (!strncmp(ptr, "startvideo", 10))
+                {
+                    tmpAction->setRTPEchoActInfo(ptr);
+                    tmpAction->setActionType(CAction::E_AT_RTP_STREAM_RTPECHO_STARTVIDEO);
+                }
+                else if (!strncmp(ptr, "updatevideo", 11))
+                {
+                    tmpAction->setRTPEchoActInfo(ptr);
+                    tmpAction->setActionType(CAction::E_AT_RTP_STREAM_RTPECHO_UPDATEVIDEO);
+                }
+                else if (!strncmp(ptr, "stopvideo", 9))
+                {
+                    tmpAction->setRTPEchoActInfo(ptr);
+                    tmpAction->setActionType(CAction::E_AT_RTP_STREAM_RTPECHO_STOPVIDEO);
+                }
             } else {
                 ERROR("illegal <exec> in the scenario");
             }
-        } else if(!strcmp(actionElem, "rtp_echo")) {
+        } else if (!strcmp(actionElem, "rtp_echo")) {
             tmpAction->setActionType(CAction::E_AT_RTP_ECHO);
             handle_rhs(tmpAction, "rtp_echo");
         } else {
-            ERROR("Unknown action: %s", actionElem);
+          ERROR("Unknown action: %s", actionElem);
         }
 
         /* If the action was not well-formed, there should have already been an
@@ -1705,7 +1820,7 @@ void scenario::getActionForThisMessage(message *message)
     }
 
     /* We actually have an action element. */
-    if (message->M_actions != NULL) {
+    if (message->M_actions != nullptr) {
         ERROR("Duplicate action for %s index %d", message->desc, message->index);
     }
     message->M_actions = new CActions();
@@ -1795,103 +1910,13 @@ void scenario::getCommonAttributes(message *message)
     }
 }
 
-// char* manipulation : create a int[] from a char*
-// test first is the char* is formed by int separeted by coma
-// and then create the table
-
-int isWellFormed(char * P_listeStr, int * nombre)
-{
-    char * ptr = P_listeStr;
-    int sizeOf;
-    bool isANumber;
-
-    (*nombre) = 0;
-    sizeOf = strlen(P_listeStr);
-    // getting the number
-    if(sizeOf > 0) {
-        // is the string well formed ? [0-9] [,]
-        isANumber = false;
-        for(int i=0; i<=sizeOf; i++) {
-            switch(ptr[i]) {
-            case ',':
-                if(isANumber == false) {
-                    return(0);
-                } else {
-                    (*nombre)++;
-                }
-                isANumber = false;
-                break;
-            case '0':
-            case '1':
-            case '2':
-            case '3':
-            case '4':
-            case '5':
-            case '6':
-            case '7':
-            case '8':
-            case '9':
-                isANumber = true;
-                break;
-            case '\t':
-            case ' ' :
-                break;
-            case '\0':
-                if(isANumber == false) {
-                    return(0);
-                } else {
-                    (*nombre)++;
-                }
-                break;
-            default:
-                return(0);
-            }
-        } // end for
-    }
-    return(1);
-}
-
-int createIntegerTable(char * P_listeStr,
-                       unsigned int ** listeInteger,
-                       int * sizeOfList)
-{
-    int nb=0;
-    char * ptr = P_listeStr;
-    char * ptr_prev = P_listeStr;
-    unsigned int current_int;
-
-    if(P_listeStr) {
-        if(isWellFormed(P_listeStr, sizeOfList) == 1) {
-            (*listeInteger) = new unsigned int[(*sizeOfList)];
-            while((*ptr) != ('\0')) {
-                if((*ptr) == ',') {
-                    sscanf(ptr_prev, "%u", &current_int);
-                    if (nb<(*sizeOfList))
-                        (*listeInteger)[nb] = current_int;
-                    nb++;
-                    ptr_prev = ptr+1;
-                }
-                ptr++;
-            }
-
-            // Read the last
-            sscanf(ptr_prev, "%u", &current_int);
-            if (nb<(*sizeOfList))
-                (*listeInteger)[nb] = current_int;
-            nb++;
-            return(1);
-        }
-        return(0);
-    } else return(0);
-}
-
 int createStringTable(const char* inputString, char*** stringList, int* sizeOfList)
 {
     if(!inputString) {
         return 0;
     }
 
-    *stringList = NULL;
+    *stringList = nullptr;
     *sizeOfList = 0;
 
     /* FIXME: temporary workaround: needs rewrite */
@@ -2138,6 +2163,7 @@ const char * default_scenario [] = {
     "\n"
     "      SIP/2.0 200 OK\n"
     "      [last_Via:]\n"
+    "      [last_Record-Route:]\n"
     "      [last_From:]\n"
     "      [last_To:];tag=[pid]SIPpTag01[call_number]\n"
     "      [last_Call-ID:]\n"
@@ -3159,7 +3185,7 @@ const char * default_scenario [] = {
     "      s=-\n"
     "      c=IN IP[local_ip_type] [local_ip]\n"
     "      t=0 0\n"
-    "      m=audio [auto_media_port] RTP/AVP 8 101\n"
+    "      m=audio [media_port] RTP/AVP 8 101\n"
     "      a=rtpmap:8 PCMA/8000\n"
     "      a=rtpmap:101 telephone-event/8000\n"
     "      a=fmtp:101 0-11,16\n"

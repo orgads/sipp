@@ -32,13 +32,13 @@
  */
 #include "sipp.hpp"
 
-class CallGenerationTask *CallGenerationTask::instance = NULL;
+class CallGenerationTask *CallGenerationTask::instance = nullptr;
 unsigned long CallGenerationTask::calls_since_last_rate_change = 0;
 unsigned long CallGenerationTask::last_rate_change_time = 0;
 
 void CallGenerationTask::initialize()
 {
-    assert(instance == NULL);
+    assert(!instance);
     instance = new CallGenerationTask();
 }
 
@@ -49,7 +49,7 @@ CallGenerationTask::CallGenerationTask()
 
 CallGenerationTask::~CallGenerationTask()
 {
-    instance = NULL;
+    instance = nullptr;
 }
 
 void CallGenerationTask::dump()
@@ -185,8 +185,10 @@ bool CallGenerationTask::run()
     }
 
     // Quit after asked number of calls is reached
-    if(total_calls >= stop_after) {
-        quitting = 1;
+    if (total_calls >= stop_after) {
+        if (!quitting) {
+            quitting = 1;
+        }
         return false;
     }
 

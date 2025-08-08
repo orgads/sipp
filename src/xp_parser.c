@@ -75,6 +75,27 @@ static const char *xp_find_escape(const char *escape, size_t len)
     return NULL;
 }
 
+static int xp_get_lineno(const char *endpos)
+{
+    const char *p = xp_file;
+    int lf_count = 0;
+
+    if (p < xp_file || p > xp_file + sizeof(xp_file)) {
+        return -1;
+    }
+
+    while (p < endpos) {
+        if (*p == '\n') {
+            lf_count += 1;
+        } else if (*p == '\0') {
+            break;
+        }
+        ++p;
+    }
+
+    return lf_count + 1;
+}
+
 /* This finds the end of something like <send foo="bar">, and does not recurse
  * into other elements. */
 static char *xp_find_start_tag_end(char *ptr)
@@ -366,6 +387,15 @@ void xp_close_element(void)
     }
 }
 
+int xp_get_invalid_line(void)
+{
+    if (xp_stack == 0) {
+        return xp_get_lineno(xp_position[1]);
+    } else {
+        return -1;
+    }
+}
+
 char *xp_get_value(const char *name)
 {
     int index = 0;
@@ -440,6 +470,8 @@ char *xp_get_value(const char *name)
                         break;
                     default:
                         buffer[index++] = '\\';
+                        if (index > XP_MAX_FILE_LEN)
+                            return NULL;
                         buffer[index++] = *ptr;
                         break;
                     }

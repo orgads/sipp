@@ -23,16 +23,13 @@
 #include "gmock/gmock.h"
 #include <string.h>
 
-namespace testing {
-    std::string FLAGS_gmock_verbose = "verbose";
-}
-
 int main(int argc, char* argv[])
 {
-    globalVariables = new AllocVariableTable(NULL);
+    globalVariables = new AllocVariableTable(nullptr);
     userVariables = new AllocVariableTable(globalVariables);
     main_scenario = new scenario(0, 0);
 
+    ::testing::GMOCK_FLAG(verbose) = "verbose";
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }
@@ -40,7 +37,7 @@ int main(int argc, char* argv[])
 /* Quickfix to fix unittests that depend on sipp_exit availability,
  * now that sipp_exit has been moved into sipp.cpp which is not
  * included. */
-void sipp_exit(int rc)
+void sipp_exit(int rc, int rtp_errors, int echo_errors)
 {
     exit(rc);
 }

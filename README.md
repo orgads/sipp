@@ -1,7 +1,3 @@
-<a href="https://travis-ci.org/SIPp/sipp">
-  <img alt="Travis Build Status"
-       src="https://api.travis-ci.org/SIPp/sipp.svg"/>
-</a>
 <a href="https://scan.coverity.com/projects/5988">
   <img alt="Coverity Scan Build Status"
        src="https://scan.coverity.com/projects/5988/badge.svg"/>
@@ -29,6 +25,8 @@ with this program.  If not, see
 See the `docs/` directory. It should also be available in html format at:
 https://sipp.readthedocs.io/en/latest/
 
+Build a local copy using: ``sphinx-build docs _build``
+
 # Building
 
 This is the SIPp package. Please refer to the
@@ -51,6 +49,16 @@ Libraries for random distributions):
 cmake . -DUSE_SSL=1 -DUSE_SCTP=1 -DUSE_PCAP=1 -DUSE_GSL=1
 ```
 
+To enable TLS key logging pass `-DUSE_SSL=KL` to cmake.
+
+TLS key logging records the TLS Session Keys to a key log file when the `SSLKEYLOGFILE` environment variable is set. It allows to decrypt SIPS traffic generated or received by SIPp using Wireshark. For more details see: https://wiki.wireshark.org/TLS
+
+You need to compile with OpenSSL>=1.1.1 in order to use TLS key logging.
+
+The TLS key log file format is described here: https://datatracker.ietf.org/doc/draft-ietf-tls-keylogfile/
+
+_Please note the security considerations ("3. Security Considerations")!_
+
 ## Static builds
 
 SIPp can be built into a single static binary, removing the need for
@@ -61,6 +69,34 @@ process](https://medium.com/@neunhoef/static-binaries-for-a-c-application-f7c76f
 and for now, it only works on Alpine Linux.
 
 To build a static binary, pass `-DBUILD_STATIC=1` to cmake.
+
+An Alpine-based `Dockerfile` is provided, which can be used as a
+build-environment.  Build with the following commands:
+
+```
+git submodule update --init
+docker build -t sipp -f docker/Dockerfile --output=. --target=bin .
+```
+
+Special arguments can be passed with `--build-arg`:
+* `FULL=1` - build all optional components.
+* `DEBUG=1` - build with debug symbols.
+
+## Debian-based docker build
+
+SIPp can be built in a Debian-based docker container. Unlike the Alpine
+build, this build is not static, and it supports wolfSSL.
+
+To build a Debian-based docker container, run:
+```
+git submodule update --init
+docker build -t sipp -f docker/Dockerfile.debian .
+```
+
+Special arguments can be passed with `--build-arg`:
+* `FULL=1` - build all optional components, including OpenSSL.
+* `WOLFSSL=1` - build with wolfSSL (only works without FULL).
+* `DEBUG=1` - build with debug symbols.
 
 Note for trustid - normally we build with:  build.sh --with-openssl
 
@@ -80,24 +116,20 @@ list](https://lists.sourceforge.net/lists/listinfo/sipp-users).
     ```
 * Then:
     ```
-    mkdir sipp-$VERSION
-    git ls-files -z | tar -c --null \
-       --exclude=gmock --exclude=gtest --files-from=- | tar -xC sipp-$VERSION
-    cp sipp.1 sipp-$VERSION/
-    # check version, and do
-    cp ${PROJECT_BINARY_DIR:-.}/version.h sipp-$VERSION/include/
-    tar --sort=name --mtime="@$(git log -1 --format=%ct)" \
-          --owner=0 --group=0 --numeric-owner \
-          -czf sipp-$VERSION.tar.gz sipp-$VERSION
+    git ls-files -z | grep -zv '^\.\|gtest\|gmock\|version.h' | \
+      tar --transform "s:^version.h:include/version.h:" \
+          --transform "s:^:sipp-$VERSION/:" \
+          --sort=name --mtime="@$(git log -1 --format=%ct)" \
+          --owner=0 --group=0 --null --files-from=- \
+          --numeric-owner -zcf sipp-$VERSION.tar.gz \
+          sipp.1 version.h
     ```
 * Upload to github as "binary". Note that github replaces tilde sign
   (for ~rcX) with a period.
 * Create a static binary and upload this to github as well:
     ```
-    sudo docker build -t sipp-build docker &&
-      sudo docker run -it -v $PWD:/src sipp-build
+    docker build -t sipp -f docker/Dockerfile --output=. --target=bin .
     ```
-* Note that the static build is broken at the moment. See `ldd sipp`.
 
 # Contributing
 

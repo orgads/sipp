@@ -55,8 +55,8 @@ typedef enum {
     E_Message_Local_Port,
     E_Message_Server_IP,
     E_Message_Media_IP,
-    E_Message_Auto_Media_Port,
     E_Message_Media_Port,
+    E_Message_Auto_Media_Port,
     E_Message_Media_IP_Type,
     E_Message_Call_Number,
     E_Message_DynamicId,   // general usage, global, autoincrementing and wrapping counter
@@ -88,7 +88,41 @@ typedef enum {
     E_Message_File,
     E_Message_Custom,
     E_Message_RTPStream_Audio_Port,
-    E_Message_RTPStream_Video_Port
+    E_Message_RTPStream_Video_Port,
+#ifdef USE_TLS
+    E_Message_CryptoTag1Audio,
+    E_Message_CryptoTag2Audio,
+    E_Message_CryptoSuiteAesCm128Sha1801Audio,
+    E_Message_CryptoSuiteAesCm128Sha1802Audio,
+    E_Message_CryptoSuiteAesCm128Sha1321Audio,
+    E_Message_CryptoSuiteAesCm128Sha1322Audio,
+    E_Message_CryptoKeyParams1Audio,
+    E_Message_CryptoKeyParams2Audio,
+    E_Message_CryptoTag1Video,
+    E_Message_CryptoTag2Video,
+    E_Message_CryptoSuiteAesCm128Sha1801Video,
+    E_Message_CryptoSuiteAesCm128Sha1802Video,
+    E_Message_CryptoSuiteAesCm128Sha1321Video,
+    E_Message_CryptoSuiteAesCm128Sha1322Video,
+    E_Message_CryptoKeyParams1Video,
+    E_Message_CryptoKeyParams2Video,
+    E_Message_CryptoSuiteNullSha1801Audio,
+    E_Message_CryptoSuiteNullSha1802Audio,
+    E_Message_CryptoSuiteNullSha1321Audio,
+    E_Message_CryptoSuiteNullSha1322Audio,
+    E_Message_CryptoSuiteNullSha1801Video,
+    E_Message_CryptoSuiteNullSha1802Video,
+    E_Message_CryptoSuiteNullSha1321Video,
+    E_Message_CryptoSuiteNullSha1322Video,
+    E_Message_UEAesCm128Sha1801Audio,
+    E_Message_UEAesCm128Sha1802Audio,
+    E_Message_UEAesCm128Sha1321Audio,
+    E_Message_UEAesCm128Sha1322Audio,
+    E_Message_UEAesCm128Sha1801Video,
+    E_Message_UEAesCm128Sha1802Video,
+    E_Message_UEAesCm128Sha1321Video,
+    E_Message_UEAesCm128Sha1322Video,
+#endif // USE_TLS
 } MessageCompType;
 
 class SendingMessage
@@ -112,14 +146,14 @@ public:
 private:
     std::vector <struct MessageComponent *> messageComponents;
 
-    char *method;
-    int code;
+    char *method = nullptr;
+    int code = 0;
 
-    bool ack;
-    bool cancel;
-    bool response;
+    bool ack = false;
+    bool cancel = false;
+    bool response = false;
 
-    scenario *msg_scenario;
+    scenario *msg_scenario = nullptr;
 
     // Get parameters from a [keyword]
     static void getQuotedParam(char * dest, char * src, int * len);

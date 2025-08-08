@@ -5,10 +5,10 @@ on: [push, pull_request]
 jobs:
   lint:
 
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
     - name: lint
       run: ./validate-src.sh
     - name: lint-xml
@@ -16,14 +16,14 @@ jobs:
 
   build:
 
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
     - name: prepare
       run: git submodule update --init
     - name: installdeps
-      run: sudo apt-get update && sudo apt-get install --yes build-essential cmake libpcap-dev openssl libssl-dev libgsl-dev libsctp-dev libncurses5-dev libncurses5
+      run: sudo apt-get update && sudo apt-get install --yes build-essential cmake libpcap-dev openssl libssl-dev libgsl-dev libsctp-dev libncurses-dev libncurses6
     - name: build
       run: ./build.sh --full
     - name: test
@@ -34,7 +34,7 @@ jobs:
     runs-on: macOS-latest
 
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
     - name: prepare
       run: git submodule update --init
     - name: build
@@ -42,16 +42,23 @@ jobs:
 
 
   build-static:
-
-    runs-on: ubuntu-latest
-
+    runs-on: ubuntu-24.04
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
     - name: prepare
       run: git submodule update --init
     - name: build-static
-      run: sudo docker build -t sipp-build docker && sudo docker run -v $PWD:/src sipp-build
-    - uses: actions/upload-artifact@v1.0.0
+      run: docker build -f docker/Dockerfile --output=. --target=bin .
+    - uses: actions/upload-artifact@v4
       with:
          name: sipp
          path: ./sipp
+
+  build-wolfssl:
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v4
+    - name: prepare
+      run: git submodule update --init
+    - name: build-wolfssl
+      run: docker build -f docker/Dockerfile.debian --build-arg WOLFSSL=1 .

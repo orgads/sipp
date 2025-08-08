@@ -22,6 +22,7 @@
 
 /* Std C includes */
 #include "config.h"
+#include "defines.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -54,13 +55,10 @@
 #include <string>
 #include <map>
 #include <set>
+#include <unordered_map>
 #include <math.h>
 #ifdef __SUNOS
 #include <stdarg.h>
-#endif
-
-#if defined(__HPUX) || defined(__SUNOS)
-#include <alloca.h>
 #endif
 
 /* Sipp includes */
@@ -82,18 +80,6 @@
 #include "reporttask.hpp"
 #include "ratetask.hpp"
 #include "watchdog.hpp"
-
-/* Backwards compatibility */
-#ifndef HAVE_STD_TOSTRING
-#include <sstream>
-namespace std {
-template <typename T> string to_string(T value) {
-    ostringstream os;
-    os << value;
-    return os.str();
-}
-}
-#endif
 
 /*
  * If this files is included in the Main, then extern definitions
@@ -153,6 +139,10 @@ template <typename T> string to_string(T value) {
 #define MAX_PEER_SIZE              4096  /* 3pcc extended mode: max size of peer names */
 #define MAX_LOCAL_TWIN_SOCKETS     10    /*3pcc extended mode:max number of peers from which
 cmd messages are received */
+#ifdef USE_TLS
+#define DEFAULT_PREFERRED_AUDIO_CRYPTOSUITE ((char*)"AES_CM_128_HMAC_SHA1_80")
+#define DEFAULT_PREFERRED_VIDEO_CRYPTOSUITE ((char*)"AES_CM_128_HMAC_SHA1_80")
+#endif // USE_TLS
 
 /******************** Default parameters ***********************/
 
@@ -178,10 +168,11 @@ cmd messages are received */
 #define DEFAULT_BEHAVIOR_BYE         1
 #define DEFAULT_BEHAVIOR_ABORTUNEXP  2
 #define DEFAULT_BEHAVIOR_PINGREPLY   4
+#define DEFAULT_BEHAVIOR_BADCSEQ     8
 
-#define DEFAULT_BEHAVIOR_ALL         (DEFAULT_BEHAVIOR_BYE | DEFAULT_BEHAVIOR_ABORTUNEXP | DEFAULT_BEHAVIOR_PINGREPLY)
+#define DEFAULT_BEHAVIOR_ALL         (DEFAULT_BEHAVIOR_BYE | DEFAULT_BEHAVIOR_ABORTUNEXP | DEFAULT_BEHAVIOR_PINGREPLY | DEFAULT_BEHAVIOR_BADCSEQ)
 
-#define DEFAULT_MIN_RTP_PORT         8192
+#define DEFAULT_MIN_RTP_PORT         DEFAULT_MEDIA_PORT
 #define DEFAULT_MAX_RTP_PORT         65535
 #define DEFAULT_RTP_PAYLOAD          8
 #define DEFAULT_RTP_THREADTASKS      20
@@ -223,6 +214,7 @@ MAYBE_EXTERN const char       * auth_username           DEFVAL(0);
 MAYBE_EXTERN unsigned long      report_freq             DEFVAL(DEFAULT_REPORT_FREQ);
 MAYBE_EXTERN unsigned long      report_freq_dumpLog     DEFVAL
 (DEFAULT_REPORT_FREQ_DUMP_LOG);
+MAYBE_EXTERN bool               rfc3339                 DEFVAL(false);
 MAYBE_EXTERN bool               periodic_rtd            DEFVAL(false);
 MAYBE_EXTERN const char       * stat_delimiter          DEFVAL(";");
 
@@ -256,16 +248,23 @@ MAYBE_EXTERN bool               gracefulclose           DEFVAL(true);
 #endif
 MAYBE_EXTERN char               control_ip[40];
 MAYBE_EXTERN int                control_port            DEFVAL(0);
-MAYBE_EXTERN int                buff_size               DEFVAL(65535);
-MAYBE_EXTERN int                tcp_readsize            DEFVAL(65535);
+MAYBE_EXTERN int                buff_size               DEFVAL(65536);
+MAYBE_EXTERN int                tcp_readsize            DEFVAL(65536);
 MAYBE_EXTERN int                hasMedia                DEFVAL(0);
+MAYBE_EXTERN int                min_rtp_port            DEFVAL(DEFAULT_MIN_RTP_PORT);
+MAYBE_EXTERN int                max_rtp_port            DEFVAL(DEFAULT_MAX_RTP_PORT);
 MAYBE_EXTERN int                rtp_default_payload     DEFVAL(DEFAULT_RTP_PAYLOAD);
 MAYBE_EXTERN int                rtp_tasks_per_thread    DEFVAL(DEFAULT_RTP_THREADTASKS);
-MAYBE_EXTERN int                rtp_buffsize            DEFVAL(65535);
+MAYBE_EXTERN int                rtp_buffsize            DEFVAL(65536);
+MAYBE_EXTERN bool               rtpcheck_debug          DEFVAL(0);
+#ifdef USE_TLS
+MAYBE_EXTERN bool               srtpcheck_debug         DEFVAL(0);
+#endif // USE_TLS
+MAYBE_EXTERN double             audiotolerance          DEFVAL(1.0);
+MAYBE_EXTERN double             videotolerance          DEFVAL(1.0);
 
 MAYBE_EXTERN bool               rtp_echo_enabled        DEFVAL(0);
 MAYBE_EXTERN char               media_ip[127];          /* also used for hostnames */
-MAYBE_EXTERN int                user_media_port         DEFVAL(0);
 MAYBE_EXTERN int                media_port              DEFVAL(0);
 MAYBE_EXTERN size_t             media_bufsize           DEFVAL(2048);
 MAYBE_EXTERN bool               media_ip_is_ipv6        DEFVAL(false);
@@ -299,7 +298,8 @@ MAYBE_EXTERN int                currentRepartitionToDisplay  DEFVAL(1);
 MAYBE_EXTERN unsigned int       base_cseq               DEFVAL(0);
 MAYBE_EXTERN char             * auth_uri                DEFVAL(0);
 MAYBE_EXTERN const char       * call_id_string          DEFVAL("%u-%p@%s");
-MAYBE_EXTERN char             **generic[100];
+typedef std::unordered_map<std::string, std::string> ParamMap;
+MAYBE_EXTERN ParamMap           generic;
 
 MAYBE_EXTERN bool               rtp_echo_state          DEFVAL(true);
 MAYBE_EXTERN bool               callidSlash             DEFVAL(false);
@@ -323,32 +323,33 @@ MAYBE_EXTERN const char       * tls_crl_name            DEFVAL(DEFAULT_TLS_CRL);
 MAYBE_EXTERN double             tls_version             DEFVAL(0.0);
 #endif
 
-MAYBE_EXTERN char*              scenario_file           DEFVAL(NULL);
-MAYBE_EXTERN char*              scenario_path           DEFVAL(NULL);
+#ifdef SO_BINDTODEVICE
+MAYBE_EXTERN const char       * bind_to_device_name     DEFVAL(nullptr);
+#endif
+
+MAYBE_EXTERN const char       * scenario_file           DEFVAL(nullptr);
 
 // extern field file management
-typedef std::map<string, FileContents *> file_map;
+typedef std::map<std::string, FileContents *> file_map;
 MAYBE_EXTERN file_map inFiles;
-typedef std::map<string, str_int_map *> file_index;
-MAYBE_EXTERN char *ip_file DEFVAL(NULL);
-MAYBE_EXTERN char *default_file DEFVAL(NULL);
+typedef std::map<std::string, str_int_map *> file_index;
+MAYBE_EXTERN char *rx_ip_file DEFVAL(NULL);
+MAYBE_EXTERN char *rx_default_file DEFVAL(NULL);
+MAYBE_EXTERN char *ip_file DEFVAL(nullptr);
+MAYBE_EXTERN char *default_file DEFVAL(nullptr);
 
 // free user id list
-MAYBE_EXTERN list<int> freeUsers;
-MAYBE_EXTERN list<int> retiredUsers;
-MAYBE_EXTERN AllocVariableTable *globalVariables        DEFVAL(NULL);
-MAYBE_EXTERN AllocVariableTable *userVariables          DEFVAL(NULL);
+MAYBE_EXTERN std::list<int> freeUsers;
+MAYBE_EXTERN std::list<int> retiredUsers;
+MAYBE_EXTERN AllocVariableTable *globalVariables        DEFVAL(nullptr);
+MAYBE_EXTERN AllocVariableTable *userVariables          DEFVAL(nullptr);
 typedef std::map<int, VariableTable *> int_vt_map;
 MAYBE_EXTERN int_vt_map         userVarMap;
 
 MAYBE_EXTERN SIPpSocket* new_sipp_socket(bool use_ipv6, int transport);
 MAYBE_EXTERN int      sipp_bind_socket(SIPpSocket *socket, struct sockaddr_storage *saddr, int *port);
 MAYBE_EXTERN void     sipp_customize_socket(SIPpSocket *socket);
-MAYBE_EXTERN int      min_socket          DEFVAL(65535);
-MAYBE_EXTERN int      select_socket       DEFVAL(0);
-MAYBE_EXTERN bool     socket_close        DEFVAL(true);
 MAYBE_EXTERN bool     test_socket         DEFVAL(true);
-MAYBE_EXTERN bool     maxSocketPresent    DEFVAL(false);
 
 #include "time.hpp"
 
@@ -372,10 +373,12 @@ MAYBE_EXTERN unsigned long rtp2_bytes                   DEFVAL(0);
 MAYBE_EXTERN unsigned long rtp2_pckts_pcap              DEFVAL(0);
 MAYBE_EXTERN unsigned long rtp2_bytes_pcap              DEFVAL(0);
 MAYBE_EXTERN volatile unsigned long rtpstream_numthreads DEFVAL(0);
-MAYBE_EXTERN volatile unsigned long rtpstream_bytes_in  DEFVAL(0);
-MAYBE_EXTERN volatile unsigned long rtpstream_bytes_out DEFVAL(0);
-MAYBE_EXTERN volatile unsigned long rtpstream_pckts     DEFVAL(0);
-
+MAYBE_EXTERN volatile unsigned long rtpstream_abytes_in  DEFVAL(0);
+MAYBE_EXTERN volatile unsigned long rtpstream_vbytes_in  DEFVAL(0);
+MAYBE_EXTERN volatile unsigned long rtpstream_abytes_out DEFVAL(0);
+MAYBE_EXTERN volatile unsigned long rtpstream_vbytes_out DEFVAL(0);
+MAYBE_EXTERN volatile unsigned long rtpstream_apckts    DEFVAL(0);
+MAYBE_EXTERN volatile unsigned long rtpstream_vpckts    DEFVAL(0);
 
 /************* Rate Control & Contexts variables **************/
 
@@ -414,9 +417,9 @@ MAYBE_EXTERN  int stepDynamicId   DEFVAL(4);      // step of increment for dynam
 
 /*********************** Global Sockets  **********************/
 
-MAYBE_EXTERN SIPpSocket   *main_socket                  DEFVAL(NULL);
-MAYBE_EXTERN SIPpSocket   *main_remote_socket           DEFVAL(NULL);
-MAYBE_EXTERN SIPpSocket   *tcp_multiplex                DEFVAL(NULL);
+MAYBE_EXTERN SIPpSocket   *main_socket                  DEFVAL(nullptr);
+MAYBE_EXTERN SIPpSocket   *main_remote_socket           DEFVAL(nullptr);
+MAYBE_EXTERN SIPpSocket   *tcp_multiplex                DEFVAL(nullptr);
 MAYBE_EXTERN int media_socket_audio                     DEFVAL(0);
 MAYBE_EXTERN int media_socket_video                     DEFVAL(0);
 
@@ -430,12 +433,12 @@ MAYBE_EXTERN bool          reset_close                  DEFVAL(true);
 MAYBE_EXTERN int           reset_sleep                  DEFVAL(1000);
 MAYBE_EXTERN bool          sendbuffer_warn              DEFVAL(false);
 /* A list of sockets pending reset. */
-MAYBE_EXTERN set<SIPpSocket*> sockets_pending_reset;
+MAYBE_EXTERN std::set<SIPpSocket*> sockets_pending_reset;
 
 MAYBE_EXTERN struct sockaddr_storage local_addr_storage;
 
-MAYBE_EXTERN SIPpSocket   *twinSippSocket               DEFVAL(NULL);
-MAYBE_EXTERN SIPpSocket   *localTwinSippSocket          DEFVAL(NULL);
+MAYBE_EXTERN SIPpSocket   *twinSippSocket               DEFVAL(nullptr);
+MAYBE_EXTERN SIPpSocket   *localTwinSippSocket          DEFVAL(nullptr);
 MAYBE_EXTERN struct sockaddr_storage twinSipp_sockaddr;
 MAYBE_EXTERN void *g_plugin_handle 		DEFVAL(NULL);  // Global Plugin handle - so we can use dlsym to call various predefined utility functions outside of main()
 
@@ -473,7 +476,7 @@ enum E_Alter_YesNo {
 
 #include "strings.hpp"
 
-void sipp_exit(int rc);
+void sipp_exit(int rc, int rtp_errors, int echo_errors);
 
 char *get_peer_addr(char *);
 
@@ -488,12 +491,12 @@ void timeout_alarm(int);
 SIPpSocket **get_peer_socket(char *);
 bool is_a_peer_socket(SIPpSocket *);
 bool is_a_local_socket(SIPpSocket *);
-void connect_to_peer(char *, int, sockaddr_storage *, char *, SIPpSocket **);
 void connect_to_all_peers();
 void connect_local_twin_socket(char *);
 void close_peer_sockets();
 void close_local_sockets();
 void free_peer_addr_map();
+void randomseed();
 
 /********************* Reset global kludge  *******************/
 

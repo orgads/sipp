@@ -33,6 +33,9 @@
 #include "send_packets.h"
 #endif
 #include "rtpstream.hpp"
+#include "srtp_channel.hpp"
+
+#include <stdarg.h>
 
 #ifndef MAX
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
@@ -57,19 +60,31 @@ struct txnInstanceInfo {
     int ackIndex;
 };
 
+typedef enum
+{
+    eNoSession,
+    eOfferReceived,
+    eOfferSent,
+    eOfferRejected,
+    eAnswerReceived,
+    eAnswerSent,
+    eCompleted,
+    eNumSessionStates
+} SessionState;
+
 class call : virtual public task, virtual public listener, public virtual socketowner
 {
 public:
     /* These are wrappers for various circumstances, (private) init does the real work. */
     //call(char * p_id, int userId, bool ipv6, bool isAutomatic);
-    call(const char *p_id, bool use_ipv6, int userId, struct sockaddr_storage *dest);
-    call(const char *p_id, SIPpSocket *socket, struct sockaddr_storage *dest);
+    call(scenario *call_scenario, const char *p_id, bool use_ipv6, int userId, struct sockaddr_storage *dest);
+    call(scenario *call_scenario, const char *p_id, SIPpSocket *socket, struct sockaddr_storage *dest);
     static call *add_call(int userId, bool ipv6, struct sockaddr_storage *dest);
     call(scenario * call_scenario, SIPpSocket *socket, struct sockaddr_storage *dest, const char * p_id, int userId, bool ipv6, bool isAutomatic, bool isInitCall);
 
     virtual ~call();
 
-    virtual bool process_incoming(const char* msg, const struct sockaddr_storage* src = NULL);
+    virtual bool process_incoming(const char* msg, const struct sockaddr_storage* src = nullptr);
     virtual bool process_twinSippCom(char* msg);
 
     virtual bool run();
@@ -143,6 +158,9 @@ public:
 private:
     /* This is the core constructor function. */
     void init(scenario * call_scenario, SIPpSocket *socket, struct sockaddr_storage *dest, const char * p_id, int userId, bool ipv6, bool isAutomatic, bool isInitCall);
+
+    bool checkAckCSeq(const char* msg);
+
     /* This this call for initialization? */
     bool initCall;
 
@@ -182,8 +200,10 @@ protected:
     int            last_recv_index;
     char         * last_recv_msg;
 
+    unsigned long int last_recv_invite_cseq;
+
     /* Recv message characteristics when we sent a valid message
-     *  (scneario, no retrans) just after a valid reception. This was
+     *  (scenario, no retrans) just after a valid reception. This was
      * a cause relationship, so the next time this cookie will be recvd,
      * we will retransmit the same message we sent this time */
     unsigned long  recv_retrans_hash;
@@ -207,6 +227,18 @@ protected:
 #endif
 
     rtpstream_callinfo_t rtpstream_callinfo;
+    SrtpChannel _txUACAudio;
+    SrtpChannel _rxUACAudio;
+    SrtpChannel _txUASAudio;
+    SrtpChannel _rxUASAudio;
+    SrtpChannel _txUACVideo;
+    SrtpChannel _rxUACVideo;
+    SrtpChannel _txUASVideo;
+    SrtpChannel _rxUASVideo;
+#ifdef USE_TLS
+    char _pref_audio_cs_out[25];
+    char _pref_video_cs_out[25];
+#endif // USE_TLS
 
     /* holds the auth header and if the challenge was 401 or 407 */
     char         * dialog_authentication;
@@ -259,7 +291,8 @@ protected:
         E_AR_TEST_DOESNT_MATCH,
         E_AR_TEST_SHOULDNT_MATCH,
         E_AR_STRCMP_DOESNT_MATCH,
-        E_AR_STRCMP_SHOULDNT_MATCH
+        E_AR_STRCMP_SHOULDNT_MATCH,
+        E_AR_RTPECHO_ERROR
     };
 
     /* Store the last action result to allow  */
@@ -278,12 +311,10 @@ protected:
     bool  rejectCall();
     double get_rhs(CAction *currentAction);
 
-    // P_index use for message index in scenario and ctrl of CRLF
-    // P_index = -2 No ctrl of CRLF
-    // P_index = -1 Add crlf to end of message
-    char* createSendingMessage(SendingMessage *src, int P_index, int *msgLen=NULL);
-    char* createSendingMessage(char * src, int P_index, bool skip_sanity = false);
-    char* createSendingMessage(SendingMessage *src, int P_index, char *msg_buffer, int buflen, int *msgLen=NULL);
+    // P_index use for message index in scenario
+    char* createSendingMessage(SendingMessage* src, int P_index=-1, int *msgLen=nullptr);
+    char* createSendingMessage(char* src, int P_index, bool skip_sanity=false);
+    char* createSendingMessage(SendingMessage*src, int P_index, char *msg_buffer, int buflen, int *msgLen=nullptr);
 
     // method for the management of unexpected messages
     bool  checkInternalCmd(char* cmd);  // check of specific internal command
@@ -340,14 +371,22 @@ protected:
 
     void get_remote_media_addr(std::string const &msg);
 
+    std::string extract_rtp_remote_addr(const char * message, int &ip_ver, int &audio_port, int &video_port);
+#ifdef USE_TLS
+    int check_audio_ciphersuite_match(SrtpAudioInfoParams &pA);
+    int check_video_ciphersuite_match(SrtpVideoInfoParams &pV);
+    int extract_srtp_remote_info(const char * msg, SrtpAudioInfoParams &pA, SrtpVideoInfoParams &pV);
+#endif // USE_TLS
     void extract_rtp_remote_addr(const char* message);
 
     bool lost(int index);
 
+    void setRtpEchoErrors(int value);
+    int getRtpEchoErrors();
+
     void computeStat (CStat::E_Action P_action);
     void computeStat (CStat::E_Action P_action, unsigned long P_value);
     void computeStat (CStat::E_Action P_action, unsigned long P_value, int which);
-
 
     void queue_up(const char* msg);
     char *queued_msg;
@@ -355,6 +394,17 @@ protected:
     int _callDebug(const char *fmt, ...) __attribute__((format(printf, 2, 3)));
     char *debugBuffer;
     int debugLength;
+
+#ifdef USE_TLS
+    FILE* _srtpctxdebugfile;
+    int logSrtpInfo(const char *fmt, ...);
+#endif // USE_TLS
+
+    SessionState _sessionStateCurrent;
+    SessionState _sessionStateOld;
+    void setSessionState(SessionState state);
+    SessionState getSessionStateCurrent();
+    SessionState getSessionStateOld();
 };
 
 

@@ -58,13 +58,44 @@ struct KeywordMap SimpleKeywords[] = {
     {"local_port", E_Message_Local_Port },
     {"server_ip", E_Message_Server_IP },
     {"media_ip", E_Message_Media_IP },
-#ifdef PCAPPLAY
-    {"auto_media_port", E_Message_Auto_Media_Port },
-#endif
-    /* Legacy since 3.6-dev. Actually uses media_port. */
     {"rtpstream_audio_port", E_Message_RTPStream_Audio_Port },
     {"rtpstream_video_port", E_Message_RTPStream_Video_Port },
+#ifdef USE_TLS
+    {"cryptotag1audio", E_Message_CryptoTag1Audio },
+    {"cryptotag2audio", E_Message_CryptoTag2Audio },
+    {"cryptosuiteaescm128sha1801audio", E_Message_CryptoSuiteAesCm128Sha1801Audio },
+    {"cryptosuiteaescm128sha1802audio", E_Message_CryptoSuiteAesCm128Sha1802Audio },
+    {"cryptosuiteaescm128sha1321audio", E_Message_CryptoSuiteAesCm128Sha1321Audio },
+    {"cryptosuiteaescm128sha1322audio", E_Message_CryptoSuiteAesCm128Sha1322Audio },
+    {"cryptokeyparams1audio", E_Message_CryptoKeyParams1Audio },
+    {"cryptokeyparams2audio", E_Message_CryptoKeyParams2Audio },
+    {"cryptotag1video", E_Message_CryptoTag1Video },
+    {"cryptotag2video", E_Message_CryptoTag2Video },
+    {"cryptosuiteaescm128sha1801video", E_Message_CryptoSuiteAesCm128Sha1801Video },
+    {"cryptosuiteaescm128sha1802video", E_Message_CryptoSuiteAesCm128Sha1802Video },
+    {"cryptosuiteaescm128sha1321video", E_Message_CryptoSuiteAesCm128Sha1321Video },
+    {"cryptosuiteaescm128sha1322video", E_Message_CryptoSuiteAesCm128Sha1322Video },
+    {"cryptokeyparams1video", E_Message_CryptoKeyParams1Video },
+    {"cryptokeyparams2video", E_Message_CryptoKeyParams2Video },
+    {"cryptosuitenullsha1801audio" , E_Message_CryptoSuiteNullSha1801Audio },
+    {"cryptosuitenullsha1802audio" , E_Message_CryptoSuiteNullSha1802Audio },
+    {"cryptosuitenullsha1321audio" , E_Message_CryptoSuiteNullSha1321Audio },
+    {"cryptosuitenullsha1322audio" , E_Message_CryptoSuiteNullSha1322Audio },
+    {"cryptosuitenullsha1801video" , E_Message_CryptoSuiteNullSha1801Video },
+    {"cryptosuitenullsha1802video" , E_Message_CryptoSuiteNullSha1802Video },
+    {"cryptosuitenullsha1321video" , E_Message_CryptoSuiteNullSha1321Video },
+    {"cryptosuitenullsha1322video" , E_Message_CryptoSuiteNullSha1322Video },
+    {"ueaescm128sha1801audio" , E_Message_UEAesCm128Sha1801Audio },
+    {"ueaescm128sha1802audio" , E_Message_UEAesCm128Sha1802Audio },
+    {"ueaescm128sha1321audio" , E_Message_UEAesCm128Sha1321Audio },
+    {"ueaescm128sha1322audio" , E_Message_UEAesCm128Sha1322Audio },
+    {"ueaescm128sha1801video" , E_Message_UEAesCm128Sha1801Video },
+    {"ueaescm128sha1802video" , E_Message_UEAesCm128Sha1802Video },
+    {"ueaescm128sha1321video" , E_Message_UEAesCm128Sha1321Video },
+    {"ueaescm128sha1322video" , E_Message_UEAesCm128Sha1322Video },
+#endif // USE_TLS
     {"media_port", E_Message_Media_Port },
+    {"auto_media_port", E_Message_Auto_Media_Port },
     {"media_ip_type", E_Message_Media_IP_Type },
     {"call_number", E_Message_Call_Number },
     {"dynamic_id", E_Message_DynamicId }, // wrapping global counter
@@ -99,11 +130,13 @@ static char* quoted_strchr(const char* s, int c)
     for (p = s; *p && *p != c; p++) {
         if (*p == '"') {
             p++;
-            p += strcspn(p, "\"");
+            p += strcspn(p, "\"\n");
+            if (!*p)
+                break;
         }
     }
 
-    return *p == c ? const_cast<char*>(p) : NULL;
+    return *p == c ? const_cast<char*>(p) : nullptr;
 }
 
 SendingMessage::SendingMessage(scenario* msg_scenario, const char* const_src, bool skip_sanity)
@@ -115,7 +148,7 @@ SendingMessage::SendingMessage(scenario* msg_scenario, const char* const_src, bo
     char * dest;
     char * key;
     char   current_line[MAX_HEADER_LEN];
-    char * line_mark = NULL;
+    char * line_mark = nullptr;
     char * tsrc;
     int    num_cr = get_cr_number(src);
 
@@ -219,7 +252,7 @@ SendingMessage::SendingMessage(scenario* msg_scenario, const char* const_src, bo
                 }
             }
 
-            char *spc = NULL;
+            char *spc = nullptr;
             char ospc;
             if ((spc = strchr(keyword, ' '))) {
                 ospc = *spc;
@@ -317,28 +350,14 @@ SendingMessage::SendingMessage(scenario* msg_scenario, const char* const_src, bo
                 newcomp->literalLen = strlen(newcomp->literal);
             } else if(!strncmp(keyword, "authentication", strlen("authentication"))) {
                 parseAuthenticationKeyword(msg_scenario, newcomp, keyword);
-            }
-#ifndef PCAPPLAY
-            else if(!strcmp(keyword, "auto_media_port")) {
-                ERROR("The %s keyword requires PCAPPLAY", keyword);
-            }
-#endif
-            else {
+            } else {
                 // scan for the generic parameters - must be last test
-
-                int i = 0;
-                while (generic[i]) {
-                    char *msg1 = *generic[i];
-                    char *msg2 = *(generic[i] + 1);
-                    if(!strcmp(keyword, msg1)) {
-                        newcomp->type = E_Message_Literal;
-                        newcomp->literal = strdup(msg2);
-                        newcomp->literalLen = strlen(newcomp->literal);
-                        break;
-                    }
-                    ++i;
-                }
-                if (!generic[i]) {
+                auto gen = generic.find(keyword);
+                if (gen != generic.end()) {
+                    newcomp->type = E_Message_Literal;
+                    newcomp->literal = strdup((*gen).second.c_str());
+                    newcomp->literalLen = strlen(newcomp->literal);
+                } else {
                     ERROR("Unsupported keyword '%s' in xml scenario file",
                           keyword);
                 }
@@ -370,7 +389,7 @@ SendingMessage::SendingMessage(scenario* msg_scenario, const char* const_src, bo
 
     if (skip_sanity) {
         cancel = response = ack = false;
-        method = NULL;
+        method = nullptr;
         free(osrc);
         return;
     }
@@ -407,7 +426,7 @@ SendingMessage::SendingMessage(scenario* msg_scenario, const char* const_src, bo
         ack = false;
         cancel = false;
         free(method);
-        method = NULL;
+        method = nullptr;
     } else {
         if (p != method) {
             memmove(method, p, strlen(p) + 1);
@@ -500,7 +519,7 @@ void SendingMessage::getKeywordParam(char * src, const char * param, char * outp
     int len;
 
     len = 0;
-    key = NULL;
+    key = nullptr;
     if ((tmp = strstr(src, param))) {
         tmp += strlen(param);
         key = tmp;
