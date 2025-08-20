@@ -24,6 +24,7 @@
 
 #include <map>
 #include <list>
+#include <string_view>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <string.h>
@@ -261,8 +262,8 @@ protected:
     T_ActionResult last_action_result;
 
     /* rc == true means call not deleted by processing */
-    void formatNextReqUrl(const char* contact);
-    void computeRouteSetAndRemoteTargetUri(const char* rrList, const char* contact, bool bRequestIncoming);
+    void formatNextReqUrl(std::string_view contact);
+    void computeRouteSetAndRemoteTargetUri(std::string_view rrList, std::string_view contact, bool bRequestIncoming);
     bool matches_scenario(unsigned int index, int reply_code, char * request, char * responsecseqmethod, char *txn);
 
     bool executeMessage(message *curmsg);
@@ -349,7 +350,7 @@ protected:
     void computeStat (CStat::E_Action P_action, unsigned long P_value);
     void computeStat (CStat::E_Action P_action, unsigned long P_value, int which);
 
-    void queue_up(const char* msg);
+    void queue_up(std::string_view msg);
     char *queued_msg;
 
     int _callDebug(const char *fmt, ...) __attribute__((format(printf, 2, 3)));
