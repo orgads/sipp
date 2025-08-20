@@ -133,12 +133,12 @@ FILE*         debugvfile = nullptr;
 pthread_mutex_t  debugamutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t  debugvmutex = PTHREAD_MUTEX_INITIALIZER;
 #ifdef USE_TLS
-FILE*         debuglsrtpafile = nullptr;
-FILE*         debugrsrtpafile = nullptr;
+static std::fstream debuglsrtpafile;
+static std::fstream debugrsrtpafile;
 pthread_mutex_t  debuglsrtpamutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t  debugrsrtpamutex = PTHREAD_MUTEX_INITIALIZER;
-FILE*         debuglsrtpvfile = nullptr;
-FILE*         debugrsrtpvfile = nullptr;
+static std::fstream debuglsrtpvfile;
+static std::fstream debugrsrtpvfile;
 pthread_mutex_t  debuglsrtpvmutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t  debugrsrtpvmutex = PTHREAD_MUTEX_INITIALIZER;
 #endif // USE_TLS
@@ -323,72 +323,72 @@ void printVideoVector(char const* note, std::vector<unsigned long> const &v)
 #ifdef USE_TLS
 void printLocalAudioSrtpStuff(SrtpAudioInfoParams &p)
 {
-    if (debuglsrtpafile != nullptr)
+    if (debuglsrtpafile.is_open())
     {
         pthread_mutex_lock(&debuglsrtpamutex);
-        fprintf(debuglsrtpafile, "audio_found                     : %d\n", p.audio_found);
-        fprintf(debuglsrtpafile, "primary_audio_cryptotag         : %d\n", p.primary_audio_cryptotag);
-        fprintf(debuglsrtpafile, "secondary_audio_cryptotag       : %d\n", p.secondary_audio_cryptotag);
-        fprintf(debuglsrtpafile, "primary_audio_cryptosuite       : %s\n", p.primary_audio_cryptosuite);
-        fprintf(debuglsrtpafile, "secondary_audio_cryptosuite     : %s\n", p.secondary_audio_cryptosuite);
-        fprintf(debuglsrtpafile, "primary_audio_cryptokeyparams   : %s\n", p.primary_audio_cryptokeyparams);
-        fprintf(debuglsrtpafile, "secondary_audio_cryptokeyparams : %s\n", p.secondary_audio_cryptokeyparams);
-        fprintf(debuglsrtpafile, "primary_unencrypted_audio_srtp  : %d\n", p.primary_unencrypted_audio_srtp);
-        fprintf(debuglsrtpafile, "secondary_unencrypted_audio_srtp: %d\n", p.secondary_unencrypted_audio_srtp);
+        debuglsrtpafile << "audio_found                     : " << p.audio_found << '\n';
+        debuglsrtpafile << "primary_audio_cryptotag         : " << p.primary_audio_cryptotag << '\n';
+        debuglsrtpafile << "secondary_audio_cryptotag       : " << p.secondary_audio_cryptotag << '\n';
+        debuglsrtpafile << "primary_audio_cryptosuite       : " << p.primary_audio_cryptosuite << '\n';
+        debuglsrtpafile << "secondary_audio_cryptosuite     : " << p.secondary_audio_cryptosuite << '\n';
+        debuglsrtpafile << "primary_audio_cryptokeyparams   : " << p.primary_audio_cryptokeyparams << '\n';
+        debuglsrtpafile << "secondary_audio_cryptokeyparams : " << p.secondary_audio_cryptokeyparams << '\n';
+        debuglsrtpafile << "primary_unencrypted_audio_srtp  : " << p.primary_unencrypted_audio_srtp << '\n';
+        debuglsrtpafile << "secondary_unencrypted_audio_srtp: " << p.secondary_unencrypted_audio_srtp << '\n';
         pthread_mutex_unlock(&debuglsrtpamutex);
     }
 }
 
 void printRemoteAudioSrtpStuff(SrtpAudioInfoParams &p)
 {
-    if (debugrsrtpafile != nullptr)
+    if (debugrsrtpafile.is_open())
     {
         pthread_mutex_lock(&debugrsrtpamutex);
-        fprintf(debugrsrtpafile, "audio_found                     : %d\n", p.audio_found);
-        fprintf(debugrsrtpafile, "primary_audio_cryptotag         : %d\n", p.primary_audio_cryptotag);
-        fprintf(debugrsrtpafile, "secondary_audio_cryptotag       : %d\n", p.secondary_audio_cryptotag);
-        fprintf(debugrsrtpafile, "primary_audio_cryptosuite       : %s\n", p.primary_audio_cryptosuite);
-        fprintf(debugrsrtpafile, "secondary_audio_cryptosuite     : %s\n", p.secondary_audio_cryptosuite);
-        fprintf(debugrsrtpafile, "primary_audio_cryptokeyparams   : %s\n", p.primary_audio_cryptokeyparams);
-        fprintf(debugrsrtpafile, "secondary_audio_cryptokeyparams : %s\n", p.secondary_audio_cryptokeyparams);
-        fprintf(debugrsrtpafile, "primary_unencrypted_audio_srtp  : %d\n", p.primary_unencrypted_audio_srtp);
-        fprintf(debugrsrtpafile, "secondary_unencrypted_audio_srtp: %d\n", p.secondary_unencrypted_audio_srtp);
+        debugrsrtpafile << "audio_found                     : " << p.audio_found << '\n';
+        debugrsrtpafile << "primary_audio_cryptotag         : " << p.primary_audio_cryptotag << '\n';
+        debugrsrtpafile << "secondary_audio_cryptotag       : " << p.secondary_audio_cryptotag << '\n';
+        debugrsrtpafile << "primary_audio_cryptosuite       : " << p.primary_audio_cryptosuite << '\n';
+        debugrsrtpafile << "secondary_audio_cryptosuite     : " << p.secondary_audio_cryptosuite << '\n';
+        debugrsrtpafile << "primary_audio_cryptokeyparams   : " << p.primary_audio_cryptokeyparams << '\n';
+        debugrsrtpafile << "secondary_audio_cryptokeyparams : " << p.secondary_audio_cryptokeyparams << '\n';
+        debugrsrtpafile << "primary_unencrypted_audio_srtp  : " << p.primary_unencrypted_audio_srtp << '\n';
+        debugrsrtpafile << "secondary_unencrypted_audio_srtp: " << p.secondary_unencrypted_audio_srtp << '\n';
         pthread_mutex_unlock(&debugrsrtpamutex);
     }
 }
 
 void printLocalVideoSrtpStuff(SrtpVideoInfoParams &p)
 {
-    if (debuglsrtpvfile != nullptr)
+    if (debuglsrtpvfile.is_open())
     {
         pthread_mutex_lock(&debuglsrtpvmutex);
-        fprintf(debuglsrtpvfile, "video_found                     : %d\n", p.video_found);
-        fprintf(debuglsrtpvfile, "primary_video_cryptotag         : %d\n", p.primary_video_cryptotag);
-        fprintf(debuglsrtpvfile, "secondary_video_cryptotag       : %d\n", p.secondary_video_cryptotag);
-        fprintf(debuglsrtpvfile, "primary_video_cryptosuite       : %s\n", p.primary_video_cryptosuite);
-        fprintf(debuglsrtpvfile, "secondary_video_cryptosuite     : %s\n", p.secondary_video_cryptosuite);
-        fprintf(debuglsrtpvfile, "primary_video_cryptokeyparams   : %s\n", p.primary_video_cryptokeyparams);
-        fprintf(debuglsrtpvfile, "secondary_video_cryptokeyparams : %s\n", p.secondary_video_cryptokeyparams);
-        fprintf(debuglsrtpvfile, "primary_unencrypted_video_srtp  : %d\n", p.primary_unencrypted_video_srtp);
-        fprintf(debuglsrtpvfile, "secondary_unencrypted_video_srtp: %d\n", p.secondary_unencrypted_video_srtp);
+        debuglsrtpvfile << "video_found                     : " << p.video_found << '\n';
+        debuglsrtpvfile << "primary_video_cryptotag         : " << p.primary_video_cryptotag << '\n';
+        debuglsrtpvfile << "secondary_video_cryptotag       : " << p.secondary_video_cryptotag << '\n';
+        debuglsrtpvfile << "primary_video_cryptosuite       : " << p.primary_video_cryptosuite << '\n';
+        debuglsrtpvfile << "secondary_video_cryptosuite     : " << p.secondary_video_cryptosuite << '\n';
+        debuglsrtpvfile << "primary_video_cryptokeyparams   : " << p.primary_video_cryptokeyparams << '\n';
+        debuglsrtpvfile << "secondary_video_cryptokeyparams : " << p.secondary_video_cryptokeyparams << '\n';
+        debuglsrtpvfile << "primary_unencrypted_video_srtp  : " << p.primary_unencrypted_video_srtp << '\n';
+        debuglsrtpvfile << "secondary_unencrypted_video_srtp: " << p.secondary_unencrypted_video_srtp << '\n';
         pthread_mutex_unlock(&debuglsrtpvmutex);
     }
 }
 
 void printRemoteVideoSrtpStuff(SrtpVideoInfoParams &p)
 {
-    if (debugrsrtpvfile != nullptr)
+    if (debugrsrtpvfile.is_open())
     {
         pthread_mutex_lock(&debugrsrtpvmutex);
-        fprintf(debugrsrtpvfile, "video_found                     : %d\n", p.video_found);
-        fprintf(debugrsrtpvfile, "primary_video_cryptotag         : %d\n", p.primary_video_cryptotag);
-        fprintf(debugrsrtpvfile, "secondary_video_cryptotag       : %d\n", p.secondary_video_cryptotag);
-        fprintf(debugrsrtpvfile, "primary_video_cryptosuite       : %s\n", p.primary_video_cryptosuite);
-        fprintf(debugrsrtpvfile, "secondary_video_cryptosuite     : %s\n", p.secondary_video_cryptosuite);
-        fprintf(debugrsrtpvfile, "primary_video_cryptokeyparams   : %s\n", p.primary_video_cryptokeyparams);
-        fprintf(debugrsrtpvfile, "secondary_video_cryptokeyparams : %s\n", p.secondary_video_cryptokeyparams);
-        fprintf(debugrsrtpvfile, "primary_unencrypted_video_srtp  : %d\n", p.primary_unencrypted_video_srtp);
-        fprintf(debugrsrtpvfile, "secondary_unencrypted_video_srtp: %d\n", p.secondary_unencrypted_video_srtp);
+        debugrsrtpvfile << "video_found                     : " << p.video_found << '\n';
+        debugrsrtpvfile << "primary_video_cryptotag         : " << p.primary_video_cryptotag << '\n';
+        debugrsrtpvfile << "secondary_video_cryptotag       : " << p.secondary_video_cryptotag << '\n';
+        debugrsrtpvfile << "primary_video_cryptosuite       : " << p.primary_video_cryptosuite << '\n';
+        debugrsrtpvfile << "secondary_video_cryptosuite     : " << p.secondary_video_cryptosuite << '\n';
+        debugrsrtpvfile << "primary_video_cryptokeyparams   : " << p.primary_video_cryptokeyparams << '\n';
+        debugrsrtpvfile << "secondary_video_cryptokeyparams : " << p.secondary_video_cryptokeyparams << '\n';
+        debugrsrtpvfile << "primary_unencrypted_video_srtp  : " << p.primary_unencrypted_video_srtp << '\n';
+        debugrsrtpvfile << "secondary_unencrypted_video_srtp: " << p.secondary_unencrypted_video_srtp << '\n';
         pthread_mutex_unlock(&debugrsrtpvmutex);
     }
 }
@@ -443,33 +443,30 @@ int clear_bit(unsigned long* context, int value)
 }
 
 /* code checked */
-static void rtpstream_free_taskinfo(taskentry_t* taskinfo)
+taskentry_t::~taskentry_t()
 {
-    if (taskinfo) {
 #ifdef USE_TLS
-        /* audio SRTP echo activity indicators */
-        taskinfo->audio_srtp_echo_active = 0;
-        taskinfo->video_srtp_echo_active = 0;
+    /* audio SRTP echo activity indicators */
+    audio_srtp_echo_active = 0;
+    video_srtp_echo_active = 0;
 #endif // USE_TLS
 
-        /* close sockets associated with this call */
-        if (taskinfo->audio_rtp_socket != -1) {
-            close(taskinfo->audio_rtp_socket);
-        }
-        if (taskinfo->audio_rtcp_socket != -1) {
-            close(taskinfo->audio_rtcp_socket);
-        }
-        if (taskinfo->video_rtp_socket != -1) {
-            close(taskinfo->video_rtp_socket);
-        }
-        if (taskinfo->video_rtcp_socket != -1) {
-            close(taskinfo->video_rtcp_socket);
-        }
-
-        /* cleanup pthread library structure */
-        pthread_mutex_destroy(&(taskinfo->mutex));
-        free(taskinfo);
+    /* close sockets associated with this call */
+    if (audio_rtp_socket != -1) {
+        close(audio_rtp_socket);
     }
+    if (audio_rtcp_socket != -1) {
+        close(audio_rtcp_socket);
+    }
+    if (video_rtp_socket != -1) {
+        close(video_rtp_socket);
+    }
+    if (video_rtcp_socket != -1) {
+        close(video_rtcp_socket);
+    }
+
+    /* cleanup pthread library structure */
+    pthread_mutex_destroy(&mutex);
 }
 
 /* code checked */
@@ -1281,7 +1278,7 @@ static void* rtpstream_playback_thread(void* params)
                     (&threaddata->tasklist)[taskindex--] = (&threaddata->tasklist)[--threaddata->num_tasks];
                     threaddata->del_pending--;   /* must decrease del_pending after num_tasks */
                     pthread_mutex_unlock(&(threaddata->tasklist_mutex));
-                    rtpstream_free_taskinfo(taskinfo);
+                    delete taskinfo;
                     continue;
                 }
                 /* handle any other config related flags */
@@ -1405,7 +1402,7 @@ static void* rtpstream_playback_thread(void* params)
         /* small chance of race condition in this code */
         taskinfo = (&threaddata->tasklist)[taskindex];
         if (taskinfo->flags & TI_KILLTASK) {
-            rtpstream_free_taskinfo(taskinfo);
+            delete taskinfo;
         } else {
             taskinfo->parent_thread = nullptr; /* no longer associated with a thread */
         }
@@ -1579,7 +1576,7 @@ static void rtpstream_stop_task(rtpstream_callinfo_t* callinfo)
         else
         {
             /* no playback thread owner, just free it */
-            rtpstream_free_taskinfo(taskinfo);
+            delete taskinfo;
         }
         callinfo->taskinfo = nullptr;
     }
@@ -1599,14 +1596,13 @@ int rtpstream_new_call(rtpstream_callinfo_t* callinfo)
     callinfo->remote_audioport = 0;
     callinfo->remote_videoport = 0;
 
-    taskinfo = (taskentry_t *) malloc(sizeof(*taskinfo));
+    taskinfo = new taskentry_t;
     if (!taskinfo) {
         /* cannot allocate taskinfo memory - bubble error up */
         return 0;
     }
     callinfo->taskinfo = taskinfo;
 
-    memset(taskinfo, 0, sizeof(*taskinfo));
     taskinfo->flags = TI_NULLIP;
     /* socket descriptors */
     taskinfo->audio_rtp_socket = -1;
@@ -2104,17 +2100,17 @@ int rtpstream_set_srtp_audio_local(rtpstream_callinfo_t* callinfo, SrtpAudioInfo
 
     if (srtpcheck_debug)
     {
-        if (debuglsrtpafile == nullptr)
+        if (!debuglsrtpafile.is_open())
         {
             if (sendMode == MODE_CLIENT)
             {
-                debuglsrtpafile = fopen("debuglsrtpafile_uac", "w");
+                debuglsrtpafile.open("debuglsrtpafile_uac", std::ios::out | std::ios::trunc);
             }
             else if (sendMode == MODE_SERVER)
             {
-                debuglsrtpafile = fopen("debuglsrtpafile_uas", "w");
+                debuglsrtpafile.open("debuglsrtpafile_uas", std::ios::out | std::ios::trunc);
             }
-            if (debuglsrtpafile == nullptr)
+            if (!debuglsrtpafile.is_open())
             {
                 /* error encountered opening local srtp debug file */
                 return -1;
@@ -2129,15 +2125,15 @@ int rtpstream_set_srtp_audio_local(rtpstream_callinfo_t* callinfo, SrtpAudioInfo
     pthread_mutex_lock(&(taskinfo->mutex));
 
     /* clear out existing addresses  */
-    memset(&(taskinfo->local_srtp_audio_params), 0, sizeof(taskinfo->local_srtp_audio_params));
+    taskinfo->local_srtp_audio_params = {};
 
     /* Audio */
     if (p.audio_found) {
         taskinfo->local_srtp_audio_params.audio_found = true;
         taskinfo->local_srtp_audio_params.primary_audio_cryptotag = p.primary_audio_cryptotag;
         taskinfo->local_srtp_audio_params.secondary_audio_cryptotag = p.secondary_audio_cryptotag;
-        strcpy(taskinfo->local_srtp_audio_params.primary_audio_cryptosuite, p.primary_audio_cryptosuite);
-        strcpy(taskinfo->local_srtp_audio_params.secondary_audio_cryptosuite, p.secondary_audio_cryptosuite);
+        taskinfo->local_srtp_audio_params.primary_audio_cryptosuite = p.primary_audio_cryptosuite;
+        taskinfo->local_srtp_audio_params.secondary_audio_cryptosuite = p.secondary_audio_cryptosuite;
         strcpy(taskinfo->local_srtp_audio_params.primary_audio_cryptokeyparams, p.primary_audio_cryptokeyparams);
         strcpy(taskinfo->local_srtp_audio_params.secondary_audio_cryptokeyparams, p.secondary_audio_cryptokeyparams);
         taskinfo->local_srtp_audio_params.primary_unencrypted_audio_srtp = p.primary_unencrypted_audio_srtp;
@@ -2149,10 +2145,8 @@ int rtpstream_set_srtp_audio_local(rtpstream_callinfo_t* callinfo, SrtpAudioInfo
 
     if (srtpcheck_debug)
     {
-        if (debuglsrtpafile)
-        {
-            fclose(debuglsrtpafile);
-            debuglsrtpafile = nullptr;
+        if (debuglsrtpafile.is_open()) {
+            debuglsrtpafile.close();
         }
     }
 
@@ -2171,17 +2165,17 @@ int rtpstream_set_srtp_audio_remote(rtpstream_callinfo_t* callinfo, SrtpAudioInf
 
     if (srtpcheck_debug)
     {
-        if (debugrsrtpafile == nullptr)
+        if (!debugrsrtpafile.is_open())
         {
             if (sendMode == MODE_CLIENT)
             {
-                debugrsrtpafile = fopen("debugrsrtpafile_uac", "w");
+                debugrsrtpafile.open("debugrsrtpafile_uac", std::ios::out | std::ios::trunc);
             }
             else if (sendMode == MODE_SERVER)
             {
-                debugrsrtpafile = fopen("debugrsrtpafile_uas", "w");
+                debugrsrtpafile.open("debugrsrtpafile_uas", std::ios::out | std::ios::trunc);
             }
-            if (debugrsrtpafile == nullptr)
+            if (!debugrsrtpafile.is_open())
             {
                 /* error encountered opening local srtp debug file */
                 return -1;
@@ -2196,15 +2190,15 @@ int rtpstream_set_srtp_audio_remote(rtpstream_callinfo_t* callinfo, SrtpAudioInf
     pthread_mutex_lock(&(taskinfo->mutex));
 
     /* clear out existing addresses  */
-    memset(&(taskinfo->remote_srtp_audio_params), 0, sizeof(taskinfo->remote_srtp_audio_params));
+    taskinfo->remote_srtp_audio_params = {};
 
     /* Audio */
     if (p.audio_found) {
         taskinfo->remote_srtp_audio_params.audio_found = true;
         taskinfo->remote_srtp_audio_params.primary_audio_cryptotag = p.primary_audio_cryptotag;
         taskinfo->remote_srtp_audio_params.secondary_audio_cryptotag = p.secondary_audio_cryptotag;
-        strcpy(taskinfo->remote_srtp_audio_params.primary_audio_cryptosuite, p.primary_audio_cryptosuite);
-        strcpy(taskinfo->remote_srtp_audio_params.secondary_audio_cryptosuite, p.secondary_audio_cryptosuite);
+        taskinfo->remote_srtp_audio_params.primary_audio_cryptosuite = p.primary_audio_cryptosuite;
+        taskinfo->remote_srtp_audio_params.secondary_audio_cryptosuite = p.secondary_audio_cryptosuite;
         strcpy(taskinfo->remote_srtp_audio_params.primary_audio_cryptokeyparams, p.primary_audio_cryptokeyparams);
         strcpy(taskinfo->remote_srtp_audio_params.secondary_audio_cryptokeyparams, p.secondary_audio_cryptokeyparams);
         taskinfo->remote_srtp_audio_params.primary_unencrypted_audio_srtp = p.primary_unencrypted_audio_srtp;
@@ -2216,10 +2210,8 @@ int rtpstream_set_srtp_audio_remote(rtpstream_callinfo_t* callinfo, SrtpAudioInf
 
     if (srtpcheck_debug)
     {
-        if (debugrsrtpafile)
-        {
-            fclose(debugrsrtpafile);
-            debugrsrtpafile = nullptr;
+        if (debugrsrtpafile.is_open()) {
+            debugrsrtpafile.close();
         }
     }
 
@@ -2238,17 +2230,17 @@ int rtpstream_set_srtp_video_local(rtpstream_callinfo_t* callinfo, SrtpVideoInfo
 
     if (srtpcheck_debug)
     {
-        if (debuglsrtpvfile == nullptr)
+        if (!debuglsrtpvfile.is_open())
         {
             if (sendMode == MODE_CLIENT)
             {
-                debuglsrtpvfile = fopen("debuglsrtpvfile_uac", "w");
+                debuglsrtpvfile.open("debuglsrtpvfile_uac", std::ios::out | std::ios::trunc);
             }
             else if (sendMode == MODE_SERVER)
             {
-                debuglsrtpvfile = fopen("debuglsrtpvfile_uas", "w");
+                debuglsrtpvfile.open("debuglsrtpvfile_uas", std::ios::out | std::ios::trunc);
             }
-            if (debuglsrtpvfile == nullptr)
+            if (!debuglsrtpvfile.is_open())
             {
                 /* error encountered opening local srtp debug file */
                 return -1;
@@ -2263,15 +2255,15 @@ int rtpstream_set_srtp_video_local(rtpstream_callinfo_t* callinfo, SrtpVideoInfo
     pthread_mutex_lock(&(taskinfo->mutex));
 
     /* clear out existing addresses  */
-    memset(&(taskinfo->local_srtp_video_params), 0, sizeof(taskinfo->local_srtp_video_params));
+    taskinfo->local_srtp_video_params = {};
 
     /* Video */
     if (p.video_found) {
         taskinfo->local_srtp_video_params.video_found = true;
         taskinfo->local_srtp_video_params.primary_video_cryptotag = p.primary_video_cryptotag;
         taskinfo->local_srtp_video_params.secondary_video_cryptotag = p.secondary_video_cryptotag;
-        strcpy(taskinfo->local_srtp_video_params.primary_video_cryptosuite, p.primary_video_cryptosuite);
-        strcpy(taskinfo->local_srtp_video_params.secondary_video_cryptosuite, p.secondary_video_cryptosuite);
+        taskinfo->local_srtp_video_params.primary_video_cryptosuite = p.primary_video_cryptosuite;
+        taskinfo->local_srtp_video_params.secondary_video_cryptosuite = p.secondary_video_cryptosuite;
         strcpy(taskinfo->local_srtp_video_params.primary_video_cryptokeyparams, p.primary_video_cryptokeyparams);
         strcpy(taskinfo->local_srtp_video_params.secondary_video_cryptokeyparams, p.secondary_video_cryptokeyparams);
         taskinfo->local_srtp_video_params.primary_unencrypted_video_srtp = p.primary_unencrypted_video_srtp;
@@ -2283,10 +2275,8 @@ int rtpstream_set_srtp_video_local(rtpstream_callinfo_t* callinfo, SrtpVideoInfo
 
     if (srtpcheck_debug)
     {
-        if (debuglsrtpvfile)
-        {
-            fclose(debuglsrtpvfile);
-            debuglsrtpvfile = nullptr;
+        if (debuglsrtpvfile.is_open()) {
+            debuglsrtpvfile.close();
         }
     }
 
@@ -2305,17 +2295,17 @@ int rtpstream_set_srtp_video_remote(rtpstream_callinfo_t* callinfo, SrtpVideoInf
 
     if (srtpcheck_debug)
     {
-        if (debugrsrtpvfile == nullptr)
+        if (!debugrsrtpvfile.is_open())
         {
             if (sendMode == MODE_CLIENT)
             {
-                debugrsrtpvfile = fopen("debugrsrtpvfile_uac", "w");
+                debugrsrtpvfile.open("debugrsrtpvfile_uac", std::ios::out | std::ios::trunc);
             }
             else if (sendMode == MODE_SERVER)
             {
-                debugrsrtpvfile = fopen("debugrsrtpvfile_uas", "w");
+                debugrsrtpvfile.open("debugrsrtpvfile_uas", std::ios::out | std::ios::trunc);
             }
-            if (debugrsrtpvfile == nullptr)
+            if (!debugrsrtpvfile.is_open())
             {
                 /* error encountered opening local srtp debug file */
                 return -1;
@@ -2330,15 +2320,15 @@ int rtpstream_set_srtp_video_remote(rtpstream_callinfo_t* callinfo, SrtpVideoInf
     pthread_mutex_lock(&(taskinfo->mutex));
 
     /* clear out existing addresses  */
-    memset(&(taskinfo->remote_srtp_video_params), 0, sizeof(taskinfo->remote_srtp_video_params));
+    taskinfo->remote_srtp_video_params = {};
 
     /* Video */
     if (p.video_found) {
         taskinfo->remote_srtp_video_params.video_found = true;
         taskinfo->remote_srtp_video_params.primary_video_cryptotag = p.primary_video_cryptotag;
         taskinfo->remote_srtp_video_params.secondary_video_cryptotag = p.secondary_video_cryptotag;
-        strcpy(taskinfo->remote_srtp_video_params.primary_video_cryptosuite, p.primary_video_cryptosuite);
-        strcpy(taskinfo->remote_srtp_video_params.secondary_video_cryptosuite, p.secondary_video_cryptosuite);
+        taskinfo->remote_srtp_video_params.primary_video_cryptosuite = p.primary_video_cryptosuite;
+        taskinfo->remote_srtp_video_params.secondary_video_cryptosuite = p.secondary_video_cryptosuite;
         strcpy(taskinfo->remote_srtp_video_params.primary_video_cryptokeyparams, p.primary_video_cryptokeyparams);
         strcpy(taskinfo->remote_srtp_video_params.secondary_video_cryptokeyparams, p.secondary_video_cryptokeyparams);
         taskinfo->remote_srtp_video_params.primary_unencrypted_video_srtp = p.primary_unencrypted_video_srtp;
@@ -2350,10 +2340,8 @@ int rtpstream_set_srtp_video_remote(rtpstream_callinfo_t* callinfo, SrtpVideoInf
 
     if (srtpcheck_debug)
     {
-        if (debugrsrtpvfile)
-        {
-            fclose(debugrsrtpvfile);
-            debugrsrtpvfile = nullptr;
+        if (debugrsrtpvfile.is_open()) {
+            debugrsrtpvfile.close();
         }
     }
 

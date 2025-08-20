@@ -117,10 +117,6 @@
 
 #define SIPP_MAXFDS                65536
 
-#ifndef SIPP_MAX_MSG_SIZE
-#define SIPP_MAX_MSG_SIZE 65536
-#endif
-
 #define MSG_RETRANS_FIRST          0
 #define MSG_RETRANS_RETRANSMISSION 1
 #define MSG_RETRANS_NEVER          2

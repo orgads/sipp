@@ -30,6 +30,7 @@
 #include <string.h>
 #include "scenario.hpp"
 #include "stat.hpp"
+#include "defines.h"
 #ifdef PCAPPLAY
 #include "send_packets.h"
 #endif
@@ -198,8 +199,8 @@ protected:
     SrtpChannel _txUASVideo;
     SrtpChannel _rxUASVideo;
 #ifdef USE_TLS
-    char _pref_audio_cs_out[25];
-    char _pref_video_cs_out[25];
+    std::string_view _pref_audio_cs_out;
+    std::string_view _pref_video_cs_out;
 #endif // USE_TLS
 
     /* holds the auth header and if the challenge was 401 or 407 */
@@ -278,6 +279,15 @@ protected:
     char* createSendingMessage(char* src, int P_index, bool skip_sanity=false);
     char* createSendingMessage(SendingMessage*src, int P_index, char *msg_buffer, int buflen, int *msgLen=nullptr);
 
+    // Modern C++ version returning std::string
+    std::string createSendingMessageString(SendingMessage* src, int P_index = -1, int length = SIPP_MAX_MSG_SIZE);
+
+private:
+    // Internal implementation using std::string
+    std::string& createSendingMessageStringImpl(SendingMessage* src, int P_index, std::string& result);
+
+public:
+
     // method for the management of unexpected messages
     bool  checkInternalCmd(char* cmd);  // check of specific internal command
     // received from the twin socket
@@ -288,6 +298,7 @@ protected:
     // the twin message received
     // comes from the expected sender
     void   sendBuffer(char *buf, int len = 0);     // send a message out of a scenario
+    void   sendBuffer(const std::string& message);   // send a message out of a scenario (modern interface)
     // execution
 
     T_AutoMode checkAutomaticResponseMode(char* P_recv);
@@ -295,6 +306,7 @@ protected:
     int   sendCmdMessage(message *curmsg); // 3PCC
 
     int   sendCmdBuffer(char* cmd); // for 3PCC, send a command out of a
+    int   sendCmdBuffer(const std::string& cmd); // for 3PCC, send a command out of a scenario (modern interface)
     // scenario execution
 
     static void readInputFileContents(const char* fileName);

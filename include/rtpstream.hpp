@@ -29,123 +29,127 @@
 class JLSRTP;
 
 #ifdef USE_TLS
-typedef struct _SrtpAudioInfoParams
+struct SrtpAudioInfoParams
 {
-    bool audio_found;
-    int primary_audio_cryptotag;
-    char primary_audio_cryptosuite[25];
-    char primary_audio_cryptokeyparams[42];
-    int secondary_audio_cryptotag;
-    char secondary_audio_cryptosuite[25];
-    char secondary_audio_cryptokeyparams[42];
-    bool primary_unencrypted_audio_srtp;
-    bool secondary_unencrypted_audio_srtp;
-} SrtpAudioInfoParams;
+    bool audio_found = false;
+    int primary_audio_cryptotag = 0;
+    char primary_audio_cryptosuite_store[25] = "";
+    std::string_view primary_audio_cryptosuite;
+    char primary_audio_cryptokeyparams[42] = "";
+    int secondary_audio_cryptotag = 0;
+    char secondary_audio_cryptosuite_store[25] = "";
+    std::string_view secondary_audio_cryptosuite;
+    char secondary_audio_cryptokeyparams[42] = "";
+    bool primary_unencrypted_audio_srtp = false;
+    bool secondary_unencrypted_audio_srtp = false;
+};
 
-typedef struct _SrtpVideoInfoParams
+struct SrtpVideoInfoParams
 {
-    bool video_found;
-    int primary_video_cryptotag;
-    char primary_video_cryptosuite[25];
-    char primary_video_cryptokeyparams[42];
-    int secondary_video_cryptotag;
-    char secondary_video_cryptosuite[25];
-    char secondary_video_cryptokeyparams[42];
-    bool primary_unencrypted_video_srtp;
-    bool secondary_unencrypted_video_srtp;
-} SrtpVideoInfoParams;
+    bool video_found = false;
+    int primary_video_cryptotag = 0;
+    char primary_video_cryptosuite_store[25] = "";
+    std::string_view primary_video_cryptosuite;
+    char primary_video_cryptokeyparams[42] = "";
+    int secondary_video_cryptotag = 0;
+    char secondary_video_cryptosuite_store[25] = "";
+    std::string_view secondary_video_cryptosuite;
+    char secondary_video_cryptokeyparams[42] = "";
+    bool primary_unencrypted_video_srtp = false;
+    bool secondary_unencrypted_video_srtp = false;
+};
 #endif // USE_TLS
 
 struct threaddata_t;
-struct taskentry_t;
 
 struct taskentry_t
 {
-    threaddata_t         *parent_thread;
-    unsigned long        nextwake_ms;
-    volatile int         flags;
+    ~taskentry_t();
+    threaddata_t         *parent_thread = nullptr;
+    unsigned long        nextwake_ms = 0;
+    volatile int         flags = 0;
 
     /* rtp stream information */
-    unsigned long long   last_audio_timestamp;
-    unsigned long long   last_video_timestamp;
-    unsigned short       audio_seq_out;
-    unsigned short       video_seq_out;
-    char                 audio_payload_type;
-    char                 video_payload_type;
-    unsigned int         audio_ssrc_id;
-    unsigned int         video_ssrc_id;
+    unsigned long long   last_audio_timestamp = 0;
+    unsigned long long   last_video_timestamp = 0;
+    unsigned short       audio_seq_out = 0;
+    unsigned short       video_seq_out = 0;
+    char                 audio_payload_type = 0;
+    char                 video_payload_type = 0;
+    unsigned int         audio_ssrc_id = 0;
+    unsigned int         video_ssrc_id = 0;
 
     /* current playback information */
-    int                  audio_pattern_id; // FILE:  -1 (UNUSED) -- PATTERN: <id>
-    int                  video_pattern_id; // FILE:  -1 (UNUSED) -- PATTERN: <id>
-    int                  audio_loop_count; // FILE:  <loopCount> -- PATTERN: -1 (UNUSED)
-    int                  video_loop_count; // FILE:  <loopCount> -- PATTERN: -1 (UNUSED)
-    char                 *audio_file_bytes_start;
-    char                 *video_file_bytes_start;
-    char                 *audio_current_file_bytes;
-    char                 *video_current_file_bytes;
-    int                  audio_file_num_bytes;
-    int                  video_file_num_bytes;
-    int                  audio_file_bytes_left;
-    int                  video_file_bytes_left;
+    int                  audio_pattern_id = -1; // FILE:  -1 (UNUSED) -- PATTERN: <id>
+    int                  video_pattern_id = -1; // FILE:  -1 (UNUSED) -- PATTERN: <id>
+    int                  audio_loop_count = -1; // FILE:  <loopCount> -- PATTERN: -1 (UNUSED)
+    int                  video_loop_count = -1; // FILE:  <loopCount> -- PATTERN: -1 (UNUSED)
+    char                 *audio_file_bytes_start = nullptr;
+    char                 *video_file_bytes_start = nullptr;
+    char                 *audio_current_file_bytes = nullptr;
+    char                 *video_current_file_bytes = nullptr;
+    int                  audio_file_num_bytes = 0;
+    int                  video_file_num_bytes = 0;
+    int                  audio_file_bytes_left = 0;
+    int                  video_file_bytes_left = 0;
 
     /* playback timing information */
-    int                  audio_ms_per_packet;
-    int                  video_ms_per_packet;
-    int                  audio_bytes_per_packet;
-    int                  video_bytes_per_packet;
-    int                  audio_timeticks_per_packet;
-    int                  video_timeticks_per_packet;
-    int                  audio_timeticks_per_ms;
-    int                  video_timeticks_per_ms;
+    int                  audio_ms_per_packet = 0;
+    int                  video_ms_per_packet = 0;
+    int                  audio_bytes_per_packet = 0;
+    int                  video_bytes_per_packet = 0;
+    int                  audio_timeticks_per_packet = 0;
+    int                  video_timeticks_per_packet = 0;
+    int                  audio_timeticks_per_ms = 0;
+    int                  video_timeticks_per_ms = 0;
 
     /* new file playback information */
-    int                  new_audio_pattern_id; // FILE:  -1 (UNUSED) -- PATTERN: <id>
-    int                  new_video_pattern_id; // FILE:  -1 (UNUSED) -- PATTERN: <id>
-    char                 new_audio_payload_type;
-    char                 new_video_payload_type;
-    int                  new_audio_loop_count; // FILE:  <loopCount> -- PATTERN: -1 (UNUSED)
-    int                  new_video_loop_count; // FILE:  <loopCount> -- PATTERN: -1 (UNUSED)
-    int                  new_audio_file_size;
-    int                  new_video_file_size;
-    char                 *new_audio_file_bytes;
-    char                 *new_video_file_bytes;
-    int                  new_audio_ms_per_packet;
-    int                  new_video_ms_per_packet;
-    int                  new_audio_bytes_per_packet;
-    int                  new_video_bytes_per_packet;
-    int                  new_audio_timeticks_per_packet;
-    int                  new_video_timeticks_per_packet;
+    int                  new_audio_pattern_id = -1; // FILE:  -1 (UNUSED) -- PATTERN: <id>
+    int                  new_video_pattern_id = -1; // FILE:  -1 (UNUSED) -- PATTERN: <id>
+    char                 new_audio_payload_type = 0; // FILE/PATTERN: <payload_type> (e.g. 0, 8, 96)
+    char                 new_video_payload_type = 0; // FILE/PATTERN: <payload_type> (e.g. 0, 8, 96)
+    int                  new_audio_loop_count = -1; // FILE:  <loopCount> -- PATTERN: -1 (UNUSED)
+    int                  new_video_loop_count = -1; // FILE:  <loopCount> -- PATTERN: -1 (UNUSED)
+    int                  new_audio_file_size = 0;
+    int                  new_video_file_size = 0;
+    char                 *new_audio_file_bytes = nullptr;
+    char                 *new_video_file_bytes = nullptr;
+    int                  new_audio_ms_per_packet = 0;
+    int                  new_video_ms_per_packet = 0;
+    int                  new_audio_bytes_per_packet = 0;
+    int                  new_video_bytes_per_packet = 0;
+    int                  new_audio_timeticks_per_packet = 0;
+    int                  new_video_timeticks_per_packet = 0;
 
     /* sockets for audio/video rtp_rtcp */
-    int                  audio_rtp_socket;
-    int                  audio_rtcp_socket;
-    int                  video_rtp_socket;
-    int                  video_rtcp_socket;
+    int                  audio_rtp_socket = 0;
+    int                  audio_rtcp_socket = 0;
+    int                  video_rtp_socket = 0;
+    int                  video_rtcp_socket = 0;
 
 #ifdef USE_TLS
     /* audio/video SRTP echo activity indicators */
-    int                  audio_srtp_echo_active;
-    int                  video_srtp_echo_active;
+    int                  audio_srtp_echo_active = 0;
+    int                  video_srtp_echo_active = 0;
 #endif // USE_TLS
 
     /* rtp peer address structures */
-    struct sockaddr_storage    remote_audio_rtp_addr;
-    struct sockaddr_storage    remote_audio_rtcp_addr;
-    struct sockaddr_storage    remote_video_rtp_addr;
-    struct sockaddr_storage    remote_video_rtcp_addr;
+    struct sockaddr_storage    remote_audio_rtp_addr = {};
+    struct sockaddr_storage    remote_audio_rtcp_addr = {};
+    struct sockaddr_storage    remote_video_rtp_addr = {};
+    struct sockaddr_storage    remote_video_rtcp_addr = {};
 
     /* we will have a mutex per call. should we consider refactoring to */
     /* share mutexes across calls? makes the per-call code more complex */
 
     /* thread mananagment structures */
-    pthread_mutex_t      mutex;
+    pthread_mutex_t      mutex = {};
 
-    unsigned long        audio_comparison_errors;
-    unsigned long        video_comparison_errors;
+    unsigned long        audio_comparison_errors = 0;
+    unsigned long        video_comparison_errors = 0;
 
-    int                  audio_active;
-    int                  video_active;
+    int                  audio_active = 0;
+    int                  video_active = 0;
 
 #ifdef USE_TLS
     SrtpAudioInfoParams  local_srtp_audio_params;

@@ -40,4 +40,6 @@ extern "C" {
 #define EXIT_BIND_ERROR            -2
 #define EXIT_RTPCHECK_FAILED       -3
 
+#define SIPP_MAX_MSG_SIZE 65536
+
 #endif /* __DEFINES_H__ */

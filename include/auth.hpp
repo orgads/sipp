@@ -14,18 +14,20 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-int createAuthHeader(const char *user,
-                     const char *password,
-                     const char *method,
-                     const char *uri,
-                     const char *msgbody,
-                     const char *auth,
-                     const char *aka_OP,
-                     const char *aka_AMF,
-                     const char *aka_K,
-                     unsigned int nonce_count,
-                     char *result,
-                     size_t result_len);
+#include <string>
+
+// Modern std::string overload
+std::string createAuthHeader(const std::string& user,
+                           const std::string& password,
+                           const char* method,
+                           const std::string& uri,
+                           const char* msgbody,
+                           const char* auth,
+                           const std::string& aka_OP = {},
+                           const std::string& aka_AMF = {},
+                           const std::string& aka_K = {},
+                           unsigned int nonce_count = 1);
+
 int verifyAuthHeader(const char *user, const char *password,
                      const char *method, const char *auth,
                      const char *msgbody);
