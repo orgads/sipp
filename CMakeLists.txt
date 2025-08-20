@@ -318,6 +318,54 @@ else()
   )
 endif()
 
+# Google Benchmark support (using submodule like gtest)
+# To enable benchmarks: cmake -DBUILD_BENCHMARKS=ON ..
+option(BUILD_BENCHMARKS "Enable building of benchmark tests" ON)
+
+if(BUILD_BENCHMARKS AND EXISTS ${PROJECT_SOURCE_DIR}/benchmark/CMakeLists.txt)
+  # Configure benchmark options
+  set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "Enable testing of the benchmark library.")
+  set(BENCHMARK_ENABLE_EXCEPTIONS ON CACHE BOOL "Enable the use of exceptions in the benchmark library.")
+  set(BENCHMARK_ENABLE_LTO OFF CACHE BOOL "Enable link time optimisation of the benchmark library.")
+  set(BENCHMARK_USE_LIBCXX OFF CACHE BOOL "Build benchmark with libc++.")
+  set(BENCHMARK_ENABLE_WERROR OFF CACHE BOOL "Build Release candidates with -Werror.")
+  set(BENCHMARK_FORCE_WERROR OFF CACHE BOOL "Build Release candidates with -Werror regardless of compiler issues.")
+
+  # Add benchmark subdirectory
+  add_subdirectory(benchmark EXCLUDE_FROM_ALL)
+
+  # Main benchmark executable (all benchmarks in one)
+  add_sipp_target(sipp_benchmark
+    EXCLUDE_FROM_ALL
+    SOURCES "${PROJECT_SOURCE_DIR}/bench/sipp_benchmark.cpp"
+            "${PROJECT_SOURCE_DIR}/bench/sipp_network_benchmark.cpp"
+            "${PROJECT_SOURCE_DIR}/bench/sipp_xml_benchmark.cpp"
+            "${PROJECT_SOURCE_DIR}/bench/sipp_integration_benchmark.cpp"
+    COMPILE_DEFINITIONS "-DBENCHMARK"
+    EXTRA_INCLUDES ${PROJECT_SOURCE_DIR}/benchmark/include
+    EXTRA_LIBRARIES benchmark::benchmark benchmark::benchmark_main
+  )
+
+  # Add benchmark targets
+  add_custom_target(benchmarks
+    COMMAND sipp_benchmark --benchmark_format=console
+    DEPENDS sipp_benchmark
+    COMMENT "Running all SIPp benchmarks"
+  )
+
+  add_custom_target(benchmarks_json
+    COMMAND sipp_benchmark --benchmark_format=json --benchmark_out=benchmark_results.json
+    DEPENDS sipp_benchmark
+    COMMENT "Running SIPp benchmarks with JSON output"
+  )
+
+  message(STATUS "Google Benchmark submodule found - benchmarks enabled (BUILD_BENCHMARKS=ON)")
+elseif(BUILD_BENCHMARKS)
+  message(WARNING "BUILD_BENCHMARKS=ON but Google Benchmark submodule not found. Run 'git submodule update --init benchmark' to enable benchmarks.")
+else()
+  message(STATUS "Benchmarks disabled. Use -DBUILD_BENCHMARKS=ON to enable.")
+endif()
+
 # add version
 find_package(Git)
 file(WRITE ${PROJECT_SOURCE_DIR}/include/version.cmake
@@ -338,6 +386,12 @@ if(EXISTS ${PROJECT_SOURCE_DIR}/.git)
   )
   add_dependencies(sipp version)
   add_dependencies(sipp_unittest version)
+  if(TARGET sipp_benchmark)
+    add_dependencies(sipp_benchmark version)
+  endif()
+  if(TARGET sipp_network_benchmark)
+    add_dependencies(sipp_network_benchmark version)
+  endif()
 endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT TINFO_LIBRARY)
