@@ -262,7 +262,29 @@ static char* xp_get_keyword_value(const char *name)
 }
 #endif
 
-static char* xp_get_string(const char *name, const char *what)
+struct TempString {
+    char *str;
+
+    explicit TempString(char *s) : str(s) {
+    }
+
+    TempString(const TempString &) = delete;
+    TempString &operator=(const TempString &) = delete;
+    TempString(TempString &&other) {
+        str = other.str;
+        other.str = nullptr;
+    }
+    ~TempString() {
+        if (str)
+            free(str);
+    }
+
+    operator char*() const {
+        return str;
+    }
+};
+
+static TempString xp_get_string(const char *name, const char *what)
 {
     const char *ptr;
     char *unescaped;
@@ -277,7 +299,7 @@ static char* xp_get_string(const char *name, const char *what)
     }
     xp_unescape(ptr, unescaped);
 
-    return unescaped;
+    return TempString(unescaped);
 }
 
 static double xp_get_double(const char *name, const char *what)
@@ -746,44 +768,32 @@ scenario::scenario(char * filename, int deflt)
         scenario_file_cursor ++;
 
         if(!strcmp(elem, "CallLengthRepartition")) {
-            ptr = xp_get_string("value", "CallLengthRepartition");
-            stats->setRepartitionCallLength(ptr);
-            free(ptr);
+            stats->setRepartitionCallLength(xp_get_string("value", "CallLengthRepartition"));
         } else if(!strcmp(elem, "ResponseTimeRepartition")) {
-            ptr = xp_get_string("value", "ResponseTimeRepartition");
-            stats->setRepartitionResponseTime(ptr);
-            free(ptr);
+            stats->setRepartitionResponseTime(xp_get_string("value", "ResponseTimeRepartition"));
         } else if(!strcmp(elem, "Global")) {
-            ptr = xp_get_string("variables", "Global");
-
             char **       currentTabVarName = nullptr;
             int           currentNbVarNames;
 
-            createStringTable(ptr, &currentTabVarName, &currentNbVarNames);
+            createStringTable(xp_get_string("variables", "Global"), &currentTabVarName, &currentNbVarNames);
             for (int i = 0; i < currentNbVarNames; i++) {
                 globalVariables->find(currentTabVarName[i], true);
             }
             freeStringTable(currentTabVarName, currentNbVarNames);
-            free(ptr);
         } else if(!strcmp(elem, "User")) {
-            ptr = xp_get_string("variables", "User");
-
             char **       currentTabVarName = nullptr;
             int           currentNbVarNames;
 
-            createStringTable(ptr, &currentTabVarName, &currentNbVarNames);
+            createStringTable(xp_get_string("variables", "User"), &currentTabVarName, &currentNbVarNames);
             for (int i = 0; i < currentNbVarNames; i++) {
                 userVariables->find(currentTabVarName[i], true);
             }
             freeStringTable(currentTabVarName, currentNbVarNames);
-            free(ptr);
         } else if(!strcmp(elem, "Reference")) {
-            ptr = xp_get_string("variables", "Reference");
-
             char **       currentTabVarName = nullptr;
             int           currentNbVarNames;
 
-            createStringTable(ptr, &currentTabVarName, &currentNbVarNames);
+            createStringTable(xp_get_string("variables", "Reference"), &currentTabVarName, &currentNbVarNames);
             for (int i = 0; i < currentNbVarNames; i++) {
                 int id = allocVars->find(currentTabVarName[i], false);
                 if (id == -1) {
@@ -791,23 +801,19 @@ scenario::scenario(char * filename, int deflt)
                 }
             }
             freeStringTable(currentTabVarName, currentNbVarNames);
-            free(ptr);
         } else if(!strcmp(elem, "DefaultMessage")) {
-            char *id = xp_get_string("id", "DefaultMessage");
             if(!(ptr = xp_get_cdata())) {
                 ERROR("No CDATA in 'send' section of xml scenario file");
             }
             char *msg = clean_cdata(ptr);
-            set_default_message(id, msg);
-            free(id);
+            set_default_message(xp_get_string("id", "DefaultMessage"), msg);
             /* XXX: This should really be per scenario. */
         } else if(!strcmp(elem, "label")) {
-            ptr = xp_get_string("id", "label");
-            if (labelMap.find(ptr) != labelMap.end()) {
-                ERROR("The label name '%s' is used twice.", ptr);
+            TempString ptr = xp_get_string("id", "label");
+            if (labelMap.find(ptr.str) != labelMap.end()) {
+                ERROR("The label name '%s' is used twice.", ptr.str);
             }
-            labelMap[ptr] = messages.size();
-            free(ptr);
+            labelMap[ptr.str] = messages.size();
         } else if (!strcmp(elem, "init")) {
             /* We have an init section, which must be full of nops or labels. */
             int nop_cursor = 0;
@@ -1403,7 +1409,7 @@ void scenario::parseAction(CActions *actions)
         CAction *tmpAction = new CAction(this);
 
         if(!strcmp(actionElem, "ereg")) {
-            ptr = xp_get_string("regexp", "ereg");
+            TempString ptr = xp_get_string("regexp", "ereg");
 
             tmpAction->setActionType(CAction::E_AT_ASSIGN_FROM_REGEXP);
 
@@ -1475,21 +1481,14 @@ void scenario::parseAction(CActions *actions)
             }
 
             freeStringTable(currentTabVarName, currentNbVarNames);
-            free(ptr);
         } /* end !strcmp(actionElem, "ereg") */ else if(!strcmp(actionElem, "log")) {
-            ptr = xp_get_string("message", "log");
-            tmpAction->setMessage(ptr);
-            free(ptr);
+            tmpAction->setMessage(xp_get_string("message", "log"));
             tmpAction->setActionType(CAction::E_AT_LOG_TO_FILE);
         } else if(!strcmp(actionElem, "warning")) {
-            ptr = xp_get_string("message", "warning");
-            tmpAction->setMessage(ptr);
-            free(ptr);
+            tmpAction->setMessage(xp_get_string("message", "warning"));
             tmpAction->setActionType(CAction::E_AT_LOG_WARNING);
         } else if(!strcmp(actionElem, "error")) {
-            ptr = xp_get_string("message", "error");
-            tmpAction->setMessage(ptr);
-            free(ptr);
+            tmpAction->setMessage(xp_get_string("message", "error"));
             tmpAction->setActionType(CAction::E_AT_LOG_ERROR);
         } else if(!strcmp(actionElem, "assign")) {
             tmpAction->setActionType(CAction::E_AT_ASSIGN_FROM_VALUE);
@@ -1497,9 +1496,7 @@ void scenario::parseAction(CActions *actions)
         } else if(!strcmp(actionElem, "assignstr")) {
             tmpAction->setActionType(CAction::E_AT_ASSIGN_FROM_STRING);
             tmpAction->setVarId(xp_get_var("assign_to", "assignstr"));
-            ptr = xp_get_string("value", "assignstr");
-            tmpAction->setMessage(ptr);
-            free(ptr);
+            tmpAction->setMessage(xp_get_string("value", "assignstr"));
         } else if(!strcmp(actionElem, "gettimeofday")) {
             tmpAction->setActionType(CAction::E_AT_ASSIGN_FROM_GETTIMEOFDAY);
 
@@ -1577,33 +1574,27 @@ void scenario::parseAction(CActions *actions)
                 tmpAction->setVarIn2Id(xp_get_var("variable2", "test"));
             }
             tmpAction->setActionType(CAction::E_AT_VAR_TEST);
-            ptr = xp_get_string("compare", "test");
-            if (!strcmp(ptr, "equal")) {
+            TempString str = xp_get_string("compare", "test");
+            if (!strcmp(str, "equal")) {
                 tmpAction->setComparator(CAction::E_C_EQ);
-            } else if (!strcmp(ptr, "not_equal")) {
+            } else if (!strcmp(str, "not_equal")) {
                 tmpAction->setComparator(CAction::E_C_NE);
-            } else if (!strcmp(ptr, "greater_than")) {
+            } else if (!strcmp(str, "greater_than")) {
                 tmpAction->setComparator(CAction::E_C_GT);
-            } else if (!strcmp(ptr, "less_than")) {
+            } else if (!strcmp(str, "less_than")) {
                 tmpAction->setComparator(CAction::E_C_LT);
-            } else if (!strcmp(ptr, "greater_than_equal")) {
+            } else if (!strcmp(str, "greater_than_equal")) {
                 tmpAction->setComparator(CAction::E_C_GEQ);
-            } else if (!strcmp(ptr, "less_than_equal")) {
+            } else if (!strcmp(str, "less_than_equal")) {
                 tmpAction->setComparator(CAction::E_C_LEQ);
             } else {
-                ERROR("Invalid 'compare' parameter: %s", ptr);
+                ERROR("Invalid 'compare' parameter: %s", str.str);
             }
-            free(ptr);
         } else if(!strcmp(actionElem, "verifyauth")) {
             tmpAction->setVarId(xp_get_var("assign_to", "verifyauth"));
-            char* username_ptr = xp_get_string("username", "verifyauth");
-            char* password_ptr = xp_get_string("password", "verifyauth");
-            tmpAction->setMessage(username_ptr, 0);
-            tmpAction->setMessage(password_ptr, 1);
+            tmpAction->setMessage(xp_get_string("username", "verifyauth"), 0);
+            tmpAction->setMessage(xp_get_string("password", "verifyauth"), 1);
             tmpAction->setActionType(CAction::E_AT_VERIFY_AUTH);
-            free(username_ptr);
-            free(password_ptr);
-            username_ptr = password_ptr = nullptr;
         } else if(!strcmp(actionElem, "lookup")) {
             tmpAction->setVarId(xp_get_var("assign_to", "lookup"));
             tmpAction->setMessage(xp_get_string("file", "lookup"), 0);
